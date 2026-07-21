@@ -1,0 +1,1111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AUTO COFFEE ROLLOUT</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; border-radius:0 !important; }
+  body { font-family: Arial, Helvetica, sans-serif; background:#fff; color:#000; font-size:13px; }
+  header { background:#000; color:#fff; padding:14px 20px; display:flex; align-items:baseline; gap:14px; }
+  header h1 { font-size:16px; font-weight:bold; letter-spacing:2px; }
+  header .sub { font-size:11px; color:#999; letter-spacing:1px; text-transform:uppercase; }
+  #app { display:flex; align-items:flex-start; }
+  #form { width:430px; min-width:430px; border-right:1px solid #000; height:calc(100vh - 47px); overflow-y:auto; }
+  #previews { flex:1; padding:20px; height:calc(100vh - 47px); overflow-y:auto; background:#e9e9e9; }
+  section { border-bottom:1px solid #000; padding:14px 16px; }
+  section h2 { font-size:11px; font-weight:bold; letter-spacing:1.5px; text-transform:uppercase; margin-bottom:10px; }
+  section h2 .status { font-weight:normal; color:#666; letter-spacing:0; text-transform:none; float:right; }
+  #sec-fonts h2 { cursor:pointer; }
+  #sec-fonts.collapsed .drop, #sec-fonts.collapsed .fontlist, #sec-fonts.collapsed .hint { display:none; }
+  #sec-fonts.collapsed { padding:10px 16px; }
+  label.f { display:block; font-size:10px; font-weight:bold; text-transform:uppercase; letter-spacing:1px; margin:8px 0 3px; color:#333; }
+  input[type=text], textarea, select, input[type=month], input[type=number] {
+    width:100%; border:1px solid #000; padding:6px 8px; font-family:Arial, sans-serif; font-size:13px; background:#fff;
+  }
+  input:focus, textarea:focus { outline:2px solid #000; outline-offset:-2px; }
+  textarea { resize:vertical; }
+  .row { display:flex; gap:8px; }
+  .row > div { flex:1; }
+  .drop { border:2px dashed #000; padding:18px 12px; text-align:center; font-size:11px; text-transform:uppercase; letter-spacing:1px; cursor:pointer; background:#fafafa; }
+  .drop.over { background:#000; color:#fff; }
+  .radio-grid { display:grid; grid-template-columns:1fr 1fr; gap:4px; }
+  .radio-grid.three { grid-template-columns:1fr 1fr 1fr; }
+  .radio-grid label { border:1px solid #000; padding:7px 6px; text-align:center; font-size:10px; font-weight:bold; text-transform:uppercase; letter-spacing:0.5px; cursor:pointer; user-select:none; display:flex; align-items:center; justify-content:center; gap:6px; }
+  .radio-grid input { display:none; }
+  .radio-grid label:has(input:checked) { background:#000; color:#fff; }
+  .radio-grid .sw { width:10px; height:10px; border:1px solid rgba(0,0,0,.3); display:inline-block; flex:none; }
+  .fontlist { list-style:none; margin-top:8px; }
+  .fontlist li { display:flex; justify-content:space-between; padding:3px 0; font-size:11px; border-bottom:1px dotted #999; }
+  .fontlist .ok { font-weight:bold; }
+  .fontlist .missing { color:#999; }
+  .hint { font-size:11px; color:#666; margin-top:6px; line-height:1.4; }
+  .refbox { font-size:11px; color:#444; background:#f2f2f2; border:1px solid #ccc; padding:8px; margin-top:6px; max-height:90px; overflow-y:auto; line-height:1.45; }
+  button { border:1px solid #000; background:#fff; font-family:Arial, sans-serif; font-size:11px; font-weight:bold; text-transform:uppercase; letter-spacing:1px; padding:8px 12px; cursor:pointer; }
+  button:hover { background:#000; color:#fff; }
+  button:disabled { border-color:#aaa; color:#aaa; background:#fff; cursor:not-allowed; }
+  button.primary { background:#000; color:#fff; }
+  button.primary:hover { background:#333; }
+  button.primary:disabled { background:#aaa; border-color:#aaa; color:#eee; }
+  .prev-item { background:#fff; border:1px solid #000; margin-bottom:20px; }
+  .prev-item .bar { display:flex; justify-content:space-between; align-items:center; background:#000; color:#fff; padding:6px 10px; font-size:11px; letter-spacing:1px; }
+  .prev-item .bar button { border-color:#fff; background:#000; color:#fff; padding:4px 10px; font-size:10px; }
+  .prev-item .bar button:hover { background:#fff; color:#000; }
+  .prev-item .cv { padding:14px; text-align:center; background:#d4d4d4; }
+  canvas.doc { max-width:100%; height:auto; box-shadow:0 1px 6px rgba(0,0,0,.35); background:#fff; }
+  #exportbar { padding:14px 16px; }
+  #exportbar button { width:100%; padding:12px; }
+  .warn { color:#a40000; font-size:11px; margin-top:6px; font-weight:bold; }
+  .cust { border:1px solid #000; padding:8px; margin-top:8px; background:#f7f7f7; }
+  .cust .crow { display:grid; grid-template-columns:34px 78px repeat(4, 1fr); gap:4px; align-items:center; margin-bottom:4px; }
+  .cust .crow span { font-size:10px; font-weight:bold; }
+  .cust input { padding:4px 5px; font-size:11px; }
+  .cust .chead { display:grid; grid-template-columns:34px 78px repeat(4, 1fr); gap:4px; font-size:9px; color:#666; text-transform:uppercase; }
+  .origin-note { font-size:11px; margin-top:6px; }
+  #loaderr { padding:10px 16px; background:#a40000; color:#fff; font-size:12px; display:none; }
+</style>
+</head>
+<body>
+<header><h1>ROLLOUT</h1><span class="sub">Temple Coffee &middot; coffee release asset generator</span></header>
+<div id="loaderr"></div>
+<div id="app">
+<div id="form">
+
+  <section id="sec-fonts">
+    <h2>Fonts <span class="status" id="fontStatus"></span></h2>
+    <div class="drop" id="fontDrop">Drop font files here or click<br><span style="font-weight:normal; letter-spacing:0; text-transform:none;">TradeGothicLTStd-Bd2.otf &middot; TradeGothicLTStd-BoldExt.otf &middot; TradeGothicLTStd.otf &middot; Helvetica.ttc</span></div>
+    <input type="file" id="fontFile" multiple accept=".otf,.ttf,.ttc" style="display:none">
+    <ul class="fontlist" id="fontList"></ul>
+    <div class="hint">Fonts are cached in this browser after the first drop. Helvetica Bold + Light are pulled out of the .ttc automatically (sample cards only).</div>
+  </section>
+
+  <section id="sec-data">
+    <h2>Infosheet</h2>
+    <div class="drop" id="dataDrop">Drop infosheet CSV or XLSX here or click</div>
+    <input type="file" id="dataFile" accept=".csv,.xlsx" style="display:none">
+    <div class="hint" id="dataStatus">Nothing loaded. All fields below are editable either way.</div>
+  </section>
+
+  <section>
+    <h2>Release Type</h2>
+    <div class="radio-grid three">
+      <label><input type="radio" name="release" value="normal" checked>Normal</label>
+      <label><input type="radio" name="release" value="soe">SOE</label>
+      <label><input type="radio" name="release" value="rc">Roaster's Choice</label>
+    </div>
+  </section>
+
+  <section>
+    <h2>Origin Color <span class="status" id="originAuto"></span></h2>
+    <div class="radio-grid" id="originGrid">
+      <label><input type="radio" name="origin" value="africa"><span class="sw" style="background:#6a3347"></span>Africa</label>
+      <label><input type="radio" name="origin" value="central"><span class="sw" style="background:#0e5061"></span>Central America</label>
+      <label><input type="radio" name="origin" value="south"><span class="sw" style="background:#777b4d"></span>South America</label>
+      <label><input type="radio" name="origin" value="asiapac"><span class="sw" style="background:#ad6b61"></span>Asia-Pacific</label>
+      <label><input type="radio" name="origin" value="india"><span class="sw" style="background:#607875"></span>India</label>
+      <label><input type="radio" name="origin" value="custom">Custom</label>
+    </div>
+    <div class="cust" id="custBox" style="display:none">
+      <div class="chead"><span></span><span>hex</span><span>C</span><span>M</span><span>Y</span><span>K</span></div>
+      <div class="crow"><span>LP</span><input type="text" id="cu_lp_hex" value="#602f43"><input type="number" id="cu_lp_c" min="0" max="100" value="50"><input type="number" id="cu_lp_m" value="83"><input type="number" id="cu_lp_y" value="51"><input type="number" id="cu_lp_k" value="41"></div>
+      <div class="crow"><span>IC</span><input type="text" id="cu_ic_hex" value="#6a3347"><input type="number" id="cu_ic_c" value="47"><input type="number" id="cu_ic_m" value="84"><input type="number" id="cu_ic_y" value="51"><input type="number" id="cu_ic_k" value="36"></div>
+      <div class="crow"><span>RC</span><input type="text" id="cu_rc_hex" value="#63545a"><input type="number" id="cu_rc_c" value="58"><input type="number" id="cu_rc_m" value="62"><input type="number" id="cu_rc_y" value="50"><input type="number" id="cu_rc_k" value="28"></div>
+      <div class="hint">Hex drives the preview and label JPG. CMYK drives the PDFs. Editing hex refills CMYK with a naive conversion; override the CMYK numbers with real print values.</div>
+    </div>
+    <div class="origin-note hint">LP = label printer compensated color (label PDFs). IC = intended color (retail card, sample card, hopper cards, label JPG). RC = Roaster's Choice frame color.</div>
+  </section>
+
+  <section>
+    <h2>Coffee</h2>
+    <label class="f">Line 1 &middot; Country</label>
+    <input type="text" id="line1" value="">
+    <label class="f">Line 2 &middot; Name</label>
+    <input type="text" id="line2" value="">
+    <label class="f" id="line3Label">Line 3 &middot; Region</label>
+    <input type="text" id="line3" value="">
+    <label class="f">Flavor Notes (comma separated)</label>
+    <input type="text" id="flavor" value="">
+    <label class="f">Label Flavor Line Break (optional override, one line per row)</label>
+    <textarea id="flavorLines" rows="2" placeholder="auto"></textarea>
+    <div class="row">
+      <div><label class="f">Body</label><input type="text" id="body" value=""></div>
+      <div><label class="f">Finish</label><input type="text" id="finish" value=""></div>
+    </div>
+    <div class="row">
+      <div><label class="f">Process</label><input type="text" id="process" value=""></div>
+      <div><label class="f">12oz Price</label><input type="text" id="price" value=""></div>
+    </div>
+  </section>
+
+  <section id="sec-desc">
+    <h2>Retail Card Description</h2>
+    <textarea id="desc" rows="4" placeholder="Written by you. Wraps automatically; hit return to force a break."></textarea>
+    <div id="tastingRefWrap" style="display:none">
+      <label class="f">Infosheet tasting description (reference)</label>
+      <div class="refbox" id="tastingRef"></div>
+    </div>
+  </section>
+
+  <section id="sec-sample">
+    <h2>Sample Card Fields</h2>
+    <div class="row">
+      <div><label class="f">Variety (return = line break)</label><textarea id="variety" rows="1"></textarea></div>
+      <div><label class="f">Farm</label><input type="text" id="farm" value=""></div>
+    </div>
+    <div class="row">
+      <div><label class="f">Producer</label><input type="text" id="producer" value=""></div>
+      <div><label class="f">Region</label><input type="text" id="regionField" value=""></div>
+    </div>
+    <label class="f">Altitude</label>
+    <input type="text" id="altitude" value="">
+  </section>
+
+  <section id="sec-soe" style="display:none">
+    <h2>SOE Hopper Card Fields</h2>
+    <label class="f">Location line</label>
+    <input type="text" id="soeLocation" value="" placeholder="Mt. Ijen, Java (1100-1500 MASL)">
+    <label class="f">Extraction parameters</label>
+    <input type="text" id="soeExtraction" value="" placeholder="20g (+/-0.1g), 25-27 seconds, 38g">
+    <label class="f">Process &amp; Variety line</label>
+    <input type="text" id="soeProcVar" value="" placeholder="Natural | Typica, Lini S288, S795, Cobra">
+  </section>
+
+  <section>
+    <h2>File Naming</h2>
+    <div class="row">
+      <div><label class="f">Coffee Code</label><input type="text" id="code" value=""></div>
+      <div><label class="f">Rollout Month</label><input type="month" id="month"></div>
+    </div>
+    <div class="hint" id="fnPreview"></div>
+  </section>
+
+  <div id="exportbar">
+    <button class="primary" id="dlAll" disabled>Download All</button>
+    <div class="warn" id="exportWarn"></div>
+  </div>
+
+</div>
+<div id="previews"></div>
+</div>
+
+<script>
+/* ============ CDN loader with fallbacks ============ */
+function loadScript(urls){ return new Promise((res,rej)=>{
+  const tryNext = i => { if(i>=urls.length) return rej(new Error('all CDNs failed: '+urls[0]));
+    const s=document.createElement('script'); s.src=urls[i];
+    s.onload=()=>res(); s.onerror=()=>tryNext(i+1); document.head.appendChild(s); };
+  tryNext(0); });}
+const libsReady = Promise.all([
+  loadScript(['https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js','https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js','https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js']),
+  loadScript(['https://cdn.jsdelivr.net/npm/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js','https://unpkg.com/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js']),
+  loadScript(['https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js','https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js']),
+  loadScript(['https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js','https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js']),
+]).catch(e=>{ const el=document.getElementById('loaderr'); el.style.display='block'; el.textContent='Could not load libraries ('+e.message+'). Check your connection; PDF/XLSX export will not work until this loads.'; });
+
+/* ============ Color system ============ */
+const col = (c,m,y,k,hex)=>({cmyk:[c,m,y,k],hex});
+function cmykToHex(c,m,y,k){ c/=100;m/=100;y/=100;k/=100;
+  const r=Math.round(255*(1-c)*(1-k)), g=Math.round(255*(1-m)*(1-k)), b=Math.round(255*(1-y)*(1-k));
+  return '#'+[r,g,b].map(v=>v.toString(16).padStart(2,'0')).join(''); }
+function hexToCmyk(hex){ const m=/^#?([0-9a-f]{6})$/i.exec(hex.trim()); if(!m) return null;
+  const n=parseInt(m[1],16), r=(n>>16)/255, g=((n>>8)&255)/255, b=(n&255)/255;
+  const k=1-Math.max(r,g,b); if(k>=1) return [0,0,0,100];
+  return [ (1-r-k)/(1-k), (1-g-k)/(1-k), (1-b-k)/(1-k), k ].map(v=>Math.round(v*100)); }
+
+const ORIGINS = {
+  africa:  { name:'Africa',           lp:col(50,83,51,41,'#602f43'), ic:col(47,84,51,36,'#6a3347'), rc:col(58,62,50,28,'#63545a') },
+  central: { name:'Central America',  lp:col(91,58,58,47,'#0e3f44'), ic:col(93,58,46,28,'#0e5061'), rc:col(83,45,46,16,'#306a73') },
+  south:   { name:'South America',    lp:col(52,37,87,16,'#797c42'), ic:col(53,38,78,16,'#777b4d'), rc:col(47,35,64, 8,'#8a8c6a') },
+  asiapac: { name:'Asia-Pacific',     lp:col(28,63,58, 8,'#ad6b61'), ic:col(28,63,58, 8,'#ad6b61'), rc:col(46,58,60,24,'#7b5f55') },
+  india:   { name:'India',            lp:col(64,39,51,12,'#607875'), ic:col(64,39,51,12,'#607875'), rc:col(55,36,45, 6,'#7a8a84') },
+};
+const RC_BG    = col(14,10,15,0,'#d8d8d2');
+const WHITE    = col(0,0,0,0,'#ffffff');
+const K100     = col(0,0,0,100,'#000000');
+const RICH_BLK = col(75,68,67,90,'#0b0b0b');   // SOE retail/hopper card centers
+const RC_TEXT  = col(30,30,30,100,'#000000');  // RC label rich black text
+
+const COUNTRY_MAP = {
+  africa:['ethiopia','kenya','rwanda','burundi','uganda','tanzania','congo','dr congo','drc','malawi','zambia','zimbabwe','cameroon','ivory coast','cote d\u2019ivoire','madagascar','mozambique','yemen','south africa','south sudan','eritrea'],
+  central:['guatemala','honduras','el salvador','nicaragua','costa rica','panama','mexico','jamaica','dominican republic','haiti','cuba','puerto rico','belize'],
+  south:['colombia','brazil','brasil','peru','ecuador','bolivia','venezuela','guyana','galapagos'],
+  asiapac:['indonesia','java','sumatra','sulawesi','bali','flores','papua new guinea','png','timor','east timor','timor-leste','philippines','vietnam','thailand','laos','myanmar','china','yunnan','taiwan','hawaii','nepal'],
+  india:['india'],
+};
+function detectOrigin(country){ const c=(country||'').trim().toLowerCase(); if(!c) return null;
+  for(const [k,list] of Object.entries(COUNTRY_MAP)) if(list.some(n=>c===n||c.includes(n))) return k;
+  return null; }
+
+/* ============ App state ============ */
+const state = {
+  release:'normal', origin:'south', originIsAuto:false,
+  line1:'', line2:'', line3:'', flavor:'', flavorLines:'',
+  body:'', finish:'', process:'', price:'',
+  desc:'', variety:'', farm:'', producer:'', region:'', altitude:'',
+  soeLocation:'', soeExtraction:'', soeProcVar:'',
+  code:'', monthCode:'',
+};
+function activeColors(){
+  if(state.origin!=='custom') return ORIGINS[state.origin];
+  const g = p => col(+v('cu_'+p+'_c')||0, +v('cu_'+p+'_m')||0, +v('cu_'+p+'_y')||0, +v('cu_'+p+'_k')||0, v('cu_'+p+'_hex')||'#888888');
+  return { name:'Custom', lp:g('lp'), ic:g('ic'), rc:g('rc') };
+}
+const v = id => document.getElementById(id).value;
+
+/* ============ Font management ============ */
+const FONT_SLOTS = {
+  bd2:     {label:'Trade Gothic Bd2',       match:/bd2/i,      bytes:null},
+  bold:    {label:'Trade Gothic Bold',      match:/-bold\./i,  bytes:null},
+  boldext: {label:'Trade Gothic BoldExt',   match:/boldext/i,  bytes:null},
+  tg:      {label:'Trade Gothic',           match:/tradegothic/i, bytes:null},
+  hb:      {label:'Helvetica Bold',         match:null, bytes:null},
+  hl:      {label:'Helvetica Light',        match:null, bytes:null},
+};
+const FACE_NAMES = { bd2:'TGBd2', bold:'TGBold', boldext:'TGBoldExt', tg:'TGReg', hb:'HelvB', hl:'HelvL' };
+
+function idb(){ return new Promise((res,rej)=>{ try{
+  const r = indexedDB.open('tcri-rollout',1);
+  r.onupgradeneeded = e => e.target.result.createObjectStore('fonts');
+  r.onsuccess = e => res(e.target.result); r.onerror = ()=>rej(r.error);
+} catch(e){ rej(e); } }); }
+async function idbPut(key,val){ try{ const db=await idb(); await new Promise((res,rej)=>{ const t=db.transaction('fonts','readwrite'); t.objectStore('fonts').put(val,key); t.oncomplete=res; t.onerror=()=>rej(t.error); }); }catch(e){} }
+async function idbGet(key){ try{ const db=await idb(); return await new Promise((res,rej)=>{ const t=db.transaction('fonts','readonly'); const q=t.objectStore('fonts').get(key); q.onsuccess=()=>res(q.result||null); q.onerror=()=>rej(q.error); }); }catch(e){ return null; } }
+
+/* TTC face extraction: rebuild standalone sfnt per face */
+function extractTTCFaces(buf){
+  const dv = new DataView(buf); const u32=o=>dv.getUint32(o), u16=o=>dv.getUint16(o);
+  if(u32(0)!==0x74746366){ return [{name:nameOfSfnt(buf,0), bytes:buf}]; } // not ttc: single font
+  const numFonts = u32(8); const faces=[];
+  for(let i=0;i<numFonts;i++){
+    const off = u32(12+i*4);
+    const numTables = u16(off+4);
+    // gather table records
+    const recs=[];
+    for(let t=0;t<numTables;t++){ const ro=off+12+t*16;
+      recs.push({ tag:u32(ro), cks:u32(ro+4), off:u32(ro+8), len:u32(ro+12) }); }
+    // build standalone
+    const headerLen = 12+numTables*16;
+    let dataLen=0; for(const r of recs) dataLen += Math.ceil(r.len/4)*4;
+    const out = new Uint8Array(headerLen+dataLen); const ov=new DataView(out.buffer);
+    ov.setUint32(0, u32(off)); ov.setUint16(4, numTables);
+    const ent = Math.floor(Math.log2(numTables)), sr = Math.pow(2,ent)*16;
+    ov.setUint16(6, sr); ov.setUint16(8, ent); ov.setUint16(10, numTables*16-sr);
+    let p = headerLen;
+    recs.forEach((r,t)=>{ const ro=12+t*16;
+      ov.setUint32(ro, r.tag); ov.setUint32(ro+4, r.cks); ov.setUint32(ro+8, p); ov.setUint32(ro+12, r.len);
+      out.set(new Uint8Array(buf, r.off, r.len), p);
+      p += Math.ceil(r.len/4)*4; });
+    faces.push({ name: nameOfSfnt(out.buffer, 0), bytes: out.buffer });
+  }
+  return faces;
+}
+function nameOfSfnt(buf, off){ // read full font name (nameID 4) from name table
+  const dv=new DataView(buf); const u32=o=>dv.getUint32(o), u16=o=>dv.getUint16(o);
+  const numTables=u16(off+4);
+  for(let t=0;t<numTables;t++){ const ro=off+12+t*16;
+    if(u32(ro)===0x6e616d65){ // 'name'
+      const nOff=u32(ro+8), count=u16(nOff+2), strOff=nOff+u16(nOff+4);
+      let best=null;
+      for(let i=0;i<count;i++){ const r=nOff+6+i*12;
+        const plat=u16(r), nameID=u16(r+6), len=u16(r+8), so=strOff+u16(r+10);
+        if(nameID!==4) continue;
+        let s='';
+        if(plat===3||plat===0){ for(let j=0;j<len;j+=2) s+=String.fromCharCode(u16(so+j)); }
+        else { for(let j=0;j<len;j++) s+=String.fromCharCode(dv.getUint8(so+j)); }
+        if(!best||plat===3) best=s;
+      }
+      return best||'unknown';
+    } }
+  return 'unknown';
+}
+
+async function ingestFontFile(name, buf){
+  if(/\.ttc$/i.test(name) || new DataView(buf).getUint32(0)===0x74746366){
+    const faces = extractTTCFaces(buf);
+    for(const f of faces){
+      const n=f.name.toLowerCase();
+      if(/bold/.test(n) && !/oblique|italic/.test(n)){ FONT_SLOTS.hb.bytes=f.bytes; await idbPut('hb', f.bytes); }
+      else if(/light/.test(n) && !/oblique|italic/.test(n)){ FONT_SLOTS.hl.bytes=f.bytes; await idbPut('hl', f.bytes); }
+    }
+    return;
+  }
+  let slot=null;
+  if(FONT_SLOTS.bd2.match.test(name)) slot='bd2';
+  else if(FONT_SLOTS.boldext.match.test(name)) slot='boldext';
+  else if(FONT_SLOTS.bold.match.test(name)) slot='bold';
+  else if(/tradegothic/i.test(name)) slot='tg';
+  else { // sniff internal name
+    const n = nameOfSfnt(buf,0).toLowerCase();
+    if(/bd2|no\.? ?2/.test(n)) slot='bd2'; else if(/bold ?ext|extended/.test(n)) slot='boldext';
+    else if(/helvetica/.test(n)){ if(/bold/.test(n)) slot='hb'; else if(/light/.test(n)) slot='hl'; }
+    else if(/trade gothic/.test(n)){ slot = /bold/.test(n) ? 'bold' : 'tg'; }
+  }
+  if(slot){ FONT_SLOTS[slot].bytes=buf; await idbPut(slot, buf); }
+}
+async function registerFaces(){
+  for(const [k,s] of Object.entries(FONT_SLOTS)){
+    if(!s.bytes || s.registered) continue;
+    try{ const ff=new FontFace(FACE_NAMES[k], s.bytes); await ff.load(); document.fonts.add(ff); s.registered=true; }catch(e){ console.error('FontFace',k,e); }
+  }
+  renderFontList(); scheduleRender();
+}
+function neededFonts(){
+  if(state.release==='rc') return ['bold','boldext','tg'];
+  if(state.release==='soe') return ['bd2','bold','tg'];
+  return ['bd2','bold','boldext','tg','hb','hl'];
+}
+function fontsMissing(){ return neededFonts().filter(k=>!FONT_SLOTS[k].bytes); }
+function renderFontList(){
+  const ul=document.getElementById('fontList'); ul.innerHTML='';
+  for(const [k,s] of Object.entries(FONT_SLOTS)){
+    const li=document.createElement('li');
+    li.innerHTML = '<span>'+s.label+'</span><span class="'+(s.bytes?'ok':'missing')+'">'+(s.bytes?'LOADED':'\u2014')+'</span>';
+    ul.appendChild(li);
+  }
+  const need=fontsMissing();
+  document.getElementById('fontStatus').textContent = need.length? need.length+' needed for this release type' : 'ready \u2014 click to manage';
+  if(!need.length && !fontsPinnedOpen) document.getElementById('sec-fonts').classList.add('collapsed');
+  if(need.length){ document.getElementById('sec-fonts').classList.remove('collapsed'); fontsPinnedOpen=false; }
+}
+async function autoFetchFonts(){
+  const files=['TradeGothicLTStd-Bold.otf','TradeGothicLTStd-Bd2.otf','TradeGothicLTStd-BoldExt.otf','TradeGothicLTStd.otf','Helvetica.ttc'];
+  const slotFor = f => /Bd2/i.test(f)?'bd2' : /BoldExt/i.test(f)?'boldext' : /-Bold\./i.test(f)?'bold' : /Helvetica/i.test(f)?null : 'tg';
+  for(const f of files){
+    const s=slotFor(f);
+    if(s && FONT_SLOTS[s].bytes) continue;
+    if(!s && FONT_SLOTS.hb.bytes && FONT_SLOTS.hl.bytes) continue;
+    try{ const r=await fetch('fonts/'+encodeURIComponent(f)); if(r.ok) await ingestFontFile(f, await r.arrayBuffer()); }catch(e){}
+  }
+}
+let fontsPinnedOpen=false;
+document.querySelector('#sec-fonts h2').addEventListener('click',()=>{
+  fontsPinnedOpen = document.getElementById('sec-fonts').classList.contains('collapsed');
+  document.getElementById('sec-fonts').classList.toggle('collapsed');
+});
+(async function restoreFonts(){
+  for(const k of Object.keys(FONT_SLOTS)){ const b=await idbGet(k); if(b) FONT_SLOTS[k].bytes=b; }
+  await autoFetchFonts();
+  await registerFaces();
+})();
+
+/* ============ Infosheet parsing ============ */
+function parseCSV(text){
+  const rows=[]; let row=[], cell='', inQ=false;
+  for(let i=0;i<text.length;i++){ const ch=text[i];
+    if(inQ){ if(ch==='"'){ if(text[i+1]==='"'){cell+='"';i++;} else inQ=false; } else cell+=ch; }
+    else { if(ch==='"') inQ=true;
+      else if(ch===','){ row.push(cell); cell=''; }
+      else if(ch==='\n'||ch==='\r'){ if(ch==='\r'&&text[i+1]==='\n') i++; row.push(cell); rows.push(row); row=[]; cell=''; }
+      else cell+=ch; } }
+  if(cell.length||row.length){ row.push(cell); rows.push(row); }
+  return rows;
+}
+function applyInfosheet(rows){
+  const find = key => { const K=key.toUpperCase();
+    let r = rows.find(r=>String(r[0]||'').trim().toUpperCase()===K);
+    if(!r) r = rows.find(r=>String(r[0]||'').trim().toUpperCase().startsWith(K));
+    return r? String(r[1]??'').trim() : ''; };
+  const name = find('COFFEE NAME');
+  const country = find('COUNTRY');
+  const region = find('REGION');
+  const process = find('PROCESS');
+  const flavor = find('FLAVOR');
+  const dry = find('DRY WEIGHT'), fin = find('FINISH WEIGHT'), time = find('TOTAL BREW TIME');
+  const soeLike = /\bSOE\b/i.test(name) || /single origin espresso/i.test(name) || (dry && dry.toUpperCase()!=='N/A');
+  if(soeLike) setRelease('soe');
+
+  set('line1', country.toUpperCase());
+  // line2: coffee name minus country / process / SOE / year tokens
+  const drop = new Set([...country.toLowerCase().split(/\s+/), ...process.toLowerCase().split(/\s+/), 'soe','single','origin','espresso','anaerobic','washed','natural','honey']);
+  const l2 = name.split(/\s+/).filter(t=>{ const c=t.toLowerCase().replace(/[^a-z0-9.'-]/g,'');
+      return c && !drop.has(c) && !/^(19|20)\d\d$/.test(c) && !/^rc$/.test(c) && !(/roaster/.test(c)); }).join(' ');
+  set('line2', l2.toUpperCase());
+  set('line3', state.release==='soe' ? 'SINGLE ORIGIN ESPRESSO' : region.replace(/\s+district$/i,'').toUpperCase());
+  set('flavor', flavor);
+  set('body', find('BODY')); set('finish', find('FINISH'));
+  set('process', process);
+  // price: 12-oz Whole Bean row, RETAIL column (index 5)
+  const priceRow = rows.find(r=>String(r[1]||'').trim()==='12-oz' && /whole bean/i.test(String(r[2]||'')));
+  if(priceRow){ let p=String(priceRow[5]||'').trim().replace(/[^0-9.]/g,'');
+    if(p) set('price', '$'+(+p).toFixed(2)); }
+  set('variety', find('VARIETY').toUpperCase());
+  set('farm', find('FARM').toUpperCase());
+  set('producer', find('PRODUCER').toUpperCase());
+  set('regionField', region.toUpperCase());
+  set('altitude', find('ALTITUDE').toUpperCase());
+  const tast = find('TASTING DESCRIPTION');
+  document.getElementById('tastingRefWrap').style.display = tast? 'block':'none';
+  document.getElementById('tastingRef').textContent = tast;
+  // SOE extras
+  set('soeLocation', region && country ? region+', '+country+(find('ALTITUDE')?' ('+find('ALTITUDE').toUpperCase()+')':'') : '');
+  const t2 = time.replace(/\s*s(ec(onds)?)?\.?$/i,' seconds').trim();
+  const fin2 = (fin.match(/^\s*\S+/)||[''])[0].trim();
+  set('soeExtraction', dry && dry.toUpperCase()!=='N/A' ? [dry.replace(/\(\+\/-\s*/,'(+/-'), t2, fin2].filter(Boolean).join(', ') : '');
+  set('soeProcVar', process && find('VARIETY') ? process+' | '+find('VARIETY') : '');
+  // origin auto-detect
+  const o = detectOrigin(country);
+  if(o){ state.origin=o; state.originIsAuto=true;
+    document.querySelector('input[name=origin][value='+o+']').checked=true;
+    document.getElementById('originAuto').textContent='auto: '+country; }
+  syncCode(); syncState(); scheduleRender();
+}
+function set(id,val){ document.getElementById(id).value=val; }
+function setRelease(r){ state.release=r; document.querySelector('input[name=release][value='+r+']').checked=true; releaseChanged(); }
+
+document.getElementById('dataDrop').addEventListener('click',()=>document.getElementById('dataFile').click());
+document.getElementById('dataFile').addEventListener('change',e=>{ if(e.target.files[0]) loadData(e.target.files[0]); });
+hookDrop('dataDrop', files=>{ if(files[0]) loadData(files[0]); });
+async function loadData(file){
+  await libsReady;
+  let rows;
+  if(/\.xlsx$/i.test(file.name)){
+    const wb = XLSX.read(await file.arrayBuffer(), {type:'array'});
+    rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, raw:false, defval:''});
+  } else {
+    rows = parseCSV(await file.text());
+  }
+  applyInfosheet(rows);
+  document.getElementById('dataStatus').textContent = 'Loaded: '+file.name;
+}
+function hookDrop(id, fn){
+  const el=document.getElementById(id);
+  ['dragover','dragenter'].forEach(ev=>el.addEventListener(ev,e=>{e.preventDefault(); el.classList.add('over');}));
+  ['dragleave','drop'].forEach(ev=>el.addEventListener(ev,e=>{e.preventDefault(); el.classList.remove('over');}));
+  el.addEventListener('drop',e=>fn([...e.dataTransfer.files]));
+}
+document.getElementById('fontDrop').addEventListener('click',()=>document.getElementById('fontFile').click());
+document.getElementById('fontFile').addEventListener('change',async e=>{ for(const f of e.target.files) await ingestFontFile(f.name, await f.arrayBuffer()); await registerFaces(); });
+hookDrop('fontDrop', async files=>{ for(const f of files) await ingestFontFile(f.name, await f.arrayBuffer()); await registerFaces(); });
+
+/* ============ Code + filenames ============ */
+function syncCode(){
+  const init = s => s.split(/\s+/).map(w=>w.replace(/[^A-Za-z0-9]/g,'')[0]||'').join('');
+  let code = init(v('line1')) + init(v('line2'));
+  if(state.release==='normal') code += init(v('line3'));
+  set('code', code.toUpperCase());
+}
+function monthCode(){
+  const m=v('month'); if(!m) return 'XXX00';
+  const [y,mo]=m.split('-');
+  return ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'][+mo-1]+y.slice(2);
+}
+function filenames(){
+  const c=v('code')||'XXX', m=monthCode();
+  if(state.release==='soe') return {
+    label12:c+'_SOE-'+m+'-Label-12oz.pdf', label5:c+'_SOE-'+m+'-Label-5lb.pdf',
+    retail:c+'-SOE-'+m+'_RetailCard.pdf', jpg:c+'_SOE-'+m+'-Label-12oz.jpg' };
+  if(state.release==='rc') return {
+    label12:c+'_RC'+m+'-Biotre-12oz.pdf', label5:c+'_RC'+m+'-Biotre-5lb.pdf', jpg:c+'_RC'+m+'-Biotre-12oz.jpg' };
+  return { retail:c+'-'+m+'-RetailCard.pdf', sample:c+'-'+m+'-Samplecard.pdf',
+    label12:c+'-'+m+'-12ozLabel.pdf', label5:c+'-'+m+'-5lbLabel.pdf', jpg:c+'-'+m+'-12ozLabel.jpg' };
+}
+
+/* ============ Layout engine ============ */
+/* ops: {op:'rect'|'frame'|'line'|'text', ...}  y coords top-down in pt */
+const T = (text,font,size,track,y,color,pos)=>Object.assign({op:'text',text,font,size,track,y,color},pos);
+
+function wrapText(measure, text, font, size, track, maxW){
+  const out=[];
+  for(const para of String(text).split('\n')){
+    const words=para.split(/\s+/).filter(Boolean); let line='';
+    for(const w of words){ const t=line?line+' '+w:w;
+      if(measure(t,font,size,track)<=maxW||!line) line=t; else { out.push(line); line=w; } }
+    if(line) out.push(line);
+  }
+  return out;
+}
+function flavorLabelLines(measure, font, size, track, maxW){
+  const manual=v('flavorLines').trim();
+  if(manual) return manual.split('\n').map(s=>s.trim()).filter(Boolean);
+  const notes=v('flavor').split(',').map(s=>s.trim()).filter(Boolean);
+  if(notes.length<=1) return notes;
+  // find comma break giving most balanced 2 lines
+  let best=null;
+  for(let i=1;i<notes.length;i++){
+    const a=notes.slice(0,i).join(', ')+',', b=notes.slice(i).join(', ');
+    const wa=measure(a,font,size,track), wb=measure(b,font,size,track);
+    if(wa<=maxW&&wb<=maxW){ const d=Math.abs(wa-wb); if(!best||d<best.d) best={d,lines:[a,b]}; }
+  }
+  if(best) return best.lines;
+  return wrapText(measure, notes.join(', '), font, size, track, maxW);
+}
+function shrink(measure, text, font, size, track, maxW){
+  let s=size; while(s>size*0.6 && measure(text,font,s,track)>maxW) s-=0.25; return s;
+}
+
+/* ---- Labels (12oz + 5lb; normal / soe / rc) ---- */
+function buildLabel12(colors, mode, forJpg){
+  const W=184.32, H=167.04, ops=[]; const cx=W/2;
+  if(mode==='rc'){
+    ops.push({op:'rect',x:0,y:0,w:W,h:H,fill:RC_BG});
+    ops.push({op:'frame',outer:[11.8,10.3,W-11.8-11.77,146.3],inner:[13.8,22.9,W-13.8-13.77,131.87],fill:colors.rc});
+    const tc=RC_TEXT, m=measure;
+    ops.push(T('ROASTER\u2019S CHOICE','boldext',9,0,41.8,tc,{cx}));
+    ops.push(T(v('line1'),'bd2',14.01,50,66.7,tc,{cx}));
+    const nSize=shrink(m,v('line2'),'tg',17.24,50,W-2*22);
+    ops.push(T(v('line2'),'tg',nSize,50,87.8,tc,{cx}));
+    ops.push(T(v('line3'),'tg',11.43,30,105.1,tc,{cx}));
+    const fl=flavorLabelLines(m,'tg',11.43,20,W-2*20);
+    fl.forEach((ln,i)=>ops.push(T(ln,'tg',11.43,20,(fl.length===1?135.2:128.0)+i*14.3,tc,{cx})));
+    return {W,H,ops};
+  }
+  ops.push({op:'rect',x:0,y:0,w:W,h:H,fill:forJpg?colors.ic:colors.lp});
+  const boxTop=(H-144.3)/2;
+  if(mode==='soe') ops.push({op:'rect',x:12.8,y:boxTop,w:W-2*12.8,h:144.3,fill:K100});
+  ops.push({op:'rect',x:12.8,y:boxTop,w:W-2*12.8,h:144.3,stroke:WHITE,lw:2});
+  const m=measure, tc=WHITE, oy=boxTop-11.1; // offset vs original 11.1 box top
+  ops.push(T(v('line1'), 'bold', 14, mode==='soe'?13:50, 50.8+oy, tc, {cx}));
+  const nSize=shrink(m,v('line2'),'tg',17.23,0,W-2*22);
+  ops.push(T(v('line2'),'tg',nSize,0,72.0+oy,tc,{cx}));
+  const l3track = mode==='soe'?0:30;
+  const l3Size=shrink(m,v('line3'),'tg',11.41,l3track,W-2*17);
+  ops.push(T(v('line3'),'tg',l3Size,l3track,89.2+oy,tc,{cx}));
+  const fl=flavorLabelLines(m,'tg',11.41,20,W-2*20);
+  fl.forEach((ln,i)=>ops.push(T(ln,'tg',11.41,20,(fl.length===1?121.8:114.6)+oy+i*14.3,tc,{cx})));
+  return {W,H,ops};
+}
+function buildLabel5(colors, mode, forJpg){
+  const W=304.763, H=276.701, ops=[]; const cx=W/2, m=measure;
+  if(mode==='rc'){
+    ops.push({op:'rect',x:0,y:0,w:W,h:H,fill:RC_BG});
+    ops.push({op:'frame',outer:[18.8,17.0,W-18.8-18.86,242.7],inner:[22.1,37.9,W-22.1-22.16,218.5],fill:colors.rc});
+    const tc=RC_TEXT;
+    ops.push(T('ROASTER\u2019S CHOICE','boldext',14.92,0,69.2,tc,{cx}));
+    ops.push(T(v('line1'),'bd2',23.23,50,110.5,tc,{cx}));
+    const nSize=shrink(m,v('line2'),'tg',28.59,50,W-2*36);
+    ops.push(T(v('line2'),'tg',nSize,50,145.6,tc,{cx}));
+    ops.push(T(v('line3'),'tg',18.95,30,174.2,tc,{cx}));
+    const fl=flavorLabelLines(m,'tg',18.95,20,W-2*33);
+    fl.forEach((ln,i)=>ops.push(T(ln,'tg',18.95,20,(fl.length===1?224.1:212.3)+i*23.6,tc,{cx})));
+    return {W,H,ops};
+  }
+  ops.push({op:'rect',x:0,y:0,w:W,h:H,fill:forJpg?colors.ic:colors.lp});
+  if(mode==='soe') ops.push({op:'rect',x:20.5,y:18.7,w:263.8,h:239.3,fill:K100});
+  ops.push({op:'rect',x:20.5,y:18.7,w:263.8,h:239.3,stroke:WHITE,lw:3.3163});
+  const tc=WHITE;
+  ops.push(T(v('line1'), 'bold', 23.23, mode==='soe'?13:50, 84.6, tc, {cx}));
+  const nSize=shrink(m,v('line2'),'tg',28.59,0,W-2*36);
+  ops.push(T(v('line2'),'tg',nSize,0,119.7,tc,{cx}));
+  const l3track = mode==='soe'?0:30;
+  const l3Size=shrink(m,v('line3'),'tg',18.95,l3track,W-2*28);
+  ops.push(T(v('line3'),'tg',l3Size,l3track,148.3,tc,{cx}));
+  const fl=flavorLabelLines(m,'tg',18.95,20,W-2*33);
+  fl.forEach((ln,i)=>ops.push(T(ln,'tg',18.95,20,(fl.length===1?202.2:190.3)+i*23.7,tc,{cx})));
+  return {W,H,ops};
+}
+
+/* ---- Normal retail card (11x8.5, two-up) ---- */
+function buildRetailNormal(colors){
+  const W=792, H=612, ops=[], tc=WHITE, m=measure;
+  const card=(dx)=>{
+    ops.push({op:'rect',x:115.1+dx,y:25.3,w:297.0,h:552.7,fill:colors.ic});
+    ops.push(T(v('line1'),'bd2',19.96,50,63.9,tc,{x:134.7+dx}));
+    const nSize=shrink(m,v('line2'),'tg',19.96,50,250);
+    ops.push(T(v('line2'),'tg',nSize,50,87.8,tc,{x:134.7+dx}));
+    ops.push({op:'line',x1:136.2+dx,y1:102.35,x2:391.0+dx,y2:102.35,color:tc,lw:1});
+    const lx=135.33+dx, gap=8;
+    const vx=lbl=>lx+m(lbl,'bd2',15,40)+gap;
+    ops.push(T('FLAVOR','bd2',15,40,140.8,tc,{x:lx}));
+    const fx=vx('FLAVOR');
+    const lines=wrapText(m, v('desc'),'tg',15,0,389.7+dx-fx);
+    lines.slice(0,7).forEach((ln,i)=>ops.push(T(ln,'tg',15,0,140.9+i*23,tc,{x:fx})));
+    ops.push(T('BODY','bd2',15,40,245.8,tc,{x:lx}));
+    ops.push(T(v('body'),'tg',15,20,246.0,tc,{x:vx('BODY')}));
+    ops.push(T('FINISH','bd2',15,40,276.3,tc,{x:lx}));
+    ops.push(T(v('finish'),'tg',15,20,276.4,tc,{x:vx('FINISH')}));
+    ops.push(T('PROCESS','bd2',15,40,306.1,tc,{x:lx}));
+    ops.push(T(v('process'),'tg',15,20,306.2,tc,{x:vx('PROCESS')}));
+    ops.push(T(v('price'),'tg',11,40,333.3,tc,{right:389.7+dx}));
+    ops.push({op:'line',x1:136.4+dx,y1:364.9,x2:390.8+dx,y2:364.9,color:tc,lw:1});
+    velcro(ops, 263.6+dx, 390.1, tc, m);
+  };
+  card(0); card(297.4);
+  return {W,H,ops};
+}
+function velcro(ops, cx, yBase, tc, m){
+  const txt='VELCRO AT THIS LINE';
+  const tw=m(txt,'tg',9,20), aw=8, gap=6;
+  const x0=cx-(tw+gap+aw)/2;
+  ops.push(T(txt,'tg',9,20,yBase,tc,{x:x0}));
+  const ax=x0+tw+gap+aw/2, top=yBase-8.6, bot=yBase+0.2;
+  ops.push({op:'line',x1:ax,y1:top,x2:ax,y2:bot,color:tc,lw:0.65});
+  ops.push({op:'line',x1:ax-2.4,y1:top+2.6,x2:ax,y2:top,color:tc,lw:0.65});
+  ops.push({op:'line',x1:ax+2.4,y1:top+2.6,x2:ax,y2:top,color:tc,lw:0.65});
+}
+
+/* ---- SOE retail card page 1 ---- */
+function buildSOERetail(colors){
+  const W=792, H=612, ops=[], tc=WHITE, m=measure;
+  const card=(dx)=>{
+    ops.push({op:'rect',x:93.9+dx,y:30.1,w:288.0,h:540.0,fill:colors.ic});
+    ops.push({op:'rect',x:100.8+dx,y:35.9,w:273.6,h:528.0,fill:RICH_BLK});
+    ops.push(T(v('line1'),'bd2',19.96,13,68.2,tc,{x:108.6+dx}));
+    const nSize=shrink(m,v('line2'),'tg',19.0,0,250);
+    ops.push(T(v('line2'),'tg',nSize,0,92.2,tc,{x:108.3+dx}));
+    ops.push({op:'line',x1:110.2+dx,y1:106.65,x2:364.8+dx,y2:106.65,color:tc,lw:1});
+    const lx=109.34+dx, gap=8;
+    const vx=lbl=>lx+m(lbl,'bd2',14,0)+gap;
+    ops.push(T('FLAVOR','bd2',14,0,145.4,tc,{x:lx}));
+    const fx=vx('FLAVOR');
+    const lines=wrapText(m, v('desc'),'tg',15,0,364.8+dx-fx);
+    lines.slice(0,7).forEach((ln,i)=>ops.push(T(ln,'tg',15,0,145.2+i*21,tc,{x:fx})));
+    ops.push(T('BODY','bd2',14,0,250.4,tc,{x:lx}));
+    ops.push(T(v('body'),'tg',15,20,250.3,tc,{x:vx('BODY')}));
+    ops.push(T('FINISH','bd2',14,0,280.9,tc,{x:lx}));
+    ops.push(T(v('finish'),'tg',15,20,281.0,tc,{x:vx('FINISH')}));
+    ops.push(T('PROCESS','bd2',14,0,310.7,tc,{x:lx}));
+    ops.push(T(v('process'),'tg',15,20,310.5,tc,{x:vx('PROCESS')}));
+    ops.push(T(v('price'),'tg',11,40,337.7,tc,{right:364.2+dx}));
+    ops.push({op:'line',x1:110.4+dx,y1:369.2,x2:364.8+dx,y2:369.2,color:tc,lw:1});
+    velcro(ops, 237.9+dx, 394.4, tc, m);
+  };
+  card(0); card(288);
+  return {W,H,ops};
+}
+/* ---- SOE hopper cards page 2 ---- */
+function buildSOEHopper(colors){
+  const W=792, H=612, ops=[], m=measure;
+  const black=(dx)=>{
+    const tc=WHITE;
+    ops.push({op:'rect',x:54+dx,y:62.7,w:342,h:234,fill:colors.ic});
+    ops.push({op:'rect',x:61.3+dx,y:71.7,w:324,h:216,fill:RICH_BLK});
+    ops.push(T(v('line1'),'bd2',19.96,13,101.3,tc,{x:83.04+dx}));
+    const nSize=shrink(m,v('line2'),'tg',19.0,0,290);
+    ops.push(T(v('line2'),'tg',nSize,0,125.3,tc,{x:83.04+dx}));
+    ops.push({op:'line',x1:73.0+dx,y1:142.0,x2:374.1+dx,y2:142.0,color:tc,lw:1});
+    ops.push(T('Body','bd2',15,30,182.0,tc,{x:83.04+dx}));
+    ops.push(T(v('body'),'tg',14,20,181.2,tc,{x:123.1+dx}));
+    ops.push(T('Notes','bd2',14,30,206.7,tc,{x:83.05+dx}));
+    const notesSize=shrink(m,v('flavor'),'tg',13,0,240);
+    ops.push(T(v('flavor'),'tg',notesSize,0,206.0,tc,{x:128.1+dx}));
+    ops.push(T('Finish','bd2',15,30,232.9,tc,{x:83.04+dx}));
+    ops.push(T(v('finish'),'tg',14,20,232.2,tc,{x:130.6+dx}));
+    ops.push(T(v('process')+' Process','tg',15,20,268.3,tc,{x:83.04+dx}));
+  };
+  const white=(dx)=>{
+    const tc=K100, lx=79.62;
+    ops.push({op:'rect',x:54+dx,y:297.2,w:342,h:198,stroke:K100,lw:1.03});
+    ops.push(T(v('line1'),'bd2',19.96,13,329.6,tc,{x:79.36+dx}));
+    const nSize=shrink(m,v('line2'),'tg',19.0,0,290);
+    ops.push(T(v('line2'),'tg',nSize,0,353.6,tc,{x:79.36+dx}));
+    ops.push({op:'line',x1:69.4+dx,y1:364.7,x2:369.8+dx,y2:364.7,color:tc,lw:1});
+    const pair=(label,val,y)=>{
+      ops.push(T(label,'bd2',10,0,y,tc,{x:lx+dx}));
+      const w=m(label,'bd2',10,0);
+      const vs=shrink(m,val,'tg',10,0,369.8-(lx+w+5.6)-2);
+      ops.push(T(val,'tg',vs,0,y,tc,{x:lx+w+5.6+dx}));
+    };
+    pair('Flavor', v('flavor'), 382.9);
+    pair('Body & Finish', v('body')+', '+v('finish'), 403.4);
+    pair('Process & Variety', v('soeProcVar'), 423.9);
+    ops.push({op:'line',x1:69.4+dx,y1:436.1,x2:369.8+dx,y2:436.1,color:tc,lw:1});
+    pair('Location', v('soeLocation'), 454.4);
+    pair('Extraction Parameters', v('soeExtraction'), 474.9);
+  };
+  black(0); black(342); white(0); white(342);
+  // 4.75in reference marks under left column
+  const tc=K100;
+  ops.push({op:'line',x1:54,y1:551.8,x2:54,y2:560.8,color:tc,lw:0.5});
+  ops.push({op:'line',x1:396,y1:551.8,x2:396,y2:560.8,color:tc,lw:0.5});
+  ops.push({op:'line',x1:61.2,y1:556.3,x2:388.8,y2:556.3,color:tc,lw:1});
+  ops.push({op:'line',x1:61.2,y1:556.3,x2:66.4,y2:553.5,color:tc,lw:1});
+  ops.push({op:'line',x1:61.2,y1:556.3,x2:66.4,y2:559.1,color:tc,lw:1});
+  ops.push({op:'line',x1:388.8,y1:556.3,x2:383.6,y2:553.5,color:tc,lw:1});
+  ops.push({op:'line',x1:388.8,y1:556.3,x2:383.6,y2:559.1,color:tc,lw:1});
+  ops.push(T('4.75 in','tg',14,0,551.8,tc,{cx:225}));
+  return {W,H,ops};
+}
+
+/* ---- Sample card (8 x 8.661, two-up) ---- */
+function buildSample(colors){
+  const W=576, H=623.613, ops=[], tc=WHITE, m=measure;
+  const panel=(dx)=>{
+    const cx=144+dx;
+    ops.push({op:'rect',x:0+dx,y:0,w:288,h:H,fill:colors.ic});
+    ops.push({op:'rect',x:18+dx,y:18.8,w:252,h:585.9,stroke:WHITE,lw:2});
+    const cSize=shrink(m,v('line1'),'boldext',13,0,220);
+    ops.push(T(v('line1'),'boldext',cSize,0,85.0,tc,{cx}));
+    ops.push({op:'line',x1:76.9+dx,y1:96.1,x2:211.1+dx,y2:96.1,color:tc,lw:1});
+    const nSize=shrink(m,v('line2'),'bd2',22,0,236);
+    ops.push(T(v('line2'),'bd2',nSize,0,124.6,tc,{cx}));
+    const pair=(label,val,y,valLines)=>{
+      ops.push(T(label,'hb',11.28,0,y,tc,{cx}));
+      (valLines||[val]).forEach((ln,i)=>{
+        const vs=shrink(m,ln,'hl',11.28,0,240);
+        ops.push(T(ln,'hl',vs,0,y+15+i*15,tc,{cx}));
+      });
+    };
+    pair('BODY', v('body').toUpperCase(), 173.0);
+    const notes=v('flavor').split(',').map(s=>s.trim().toUpperCase()).filter(Boolean).slice(0,3);
+    pair('FLAVOR NOTES', '', 215.0, notes);
+    pair('FINISH', v('finish').toUpperCase(), 287.0);
+    pair('PROCESS', v('process').toUpperCase(), 329.0);
+    pair('VARIETY', '', 371.0, v('variety').toUpperCase().split('\n').map(s=>s.trim()).filter(Boolean));
+    pair('FARM', v('farm').toUpperCase(), 413.0);
+    pair('PRODUCER', v('producer').toUpperCase(), 455.0);
+    pair('REGION', v('regionField').toUpperCase(), 497.0);
+    pair('ALTITUDE', v('altitude').toUpperCase(), 539.0);
+  };
+  panel(0); panel(288);
+  return {W,H,ops};
+}
+
+/* ============ Measuring + Canvas renderer ============ */
+const mctx = document.createElement('canvas').getContext('2d');
+function measure(text, font, size, track){
+  mctx.font = size+'px "'+FACE_NAMES[font]+'"';
+  const w = mctx.measureText(text).width;
+  return w + (track/1000)*size*Math.max(0,text.length-1);
+}
+function renderCanvas(doc, canvas, scale){
+  const dpr = Math.min(window.devicePixelRatio||1, 2);
+  canvas.width = Math.round(doc.W*scale*dpr); canvas.height = Math.round(doc.H*scale*dpr);
+  canvas.style.width = Math.round(doc.W*scale)+'px';
+  const ctx=canvas.getContext('2d'); ctx.scale(scale*dpr, scale*dpr);
+  ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,doc.W,doc.H);
+  for(const o of doc.ops){
+    if(o.op==='rect'){
+      if(o.fill){ ctx.fillStyle=o.fill.hex; ctx.fillRect(o.x,o.y,o.w,o.h); }
+      if(o.stroke){ ctx.strokeStyle=o.stroke.hex; ctx.lineWidth=o.lw; ctx.strokeRect(o.x,o.y,o.w,o.h); }
+    } else if(o.op==='frame'){
+      ctx.fillStyle=o.fill.hex; ctx.beginPath();
+      ctx.rect(o.outer[0],o.outer[1],o.outer[2],o.outer[3]);
+      ctx.rect(o.inner[0],o.inner[1],o.inner[2],o.inner[3]);
+      ctx.fill('evenodd');
+    } else if(o.op==='line'){
+      ctx.strokeStyle=o.color.hex; ctx.lineWidth=o.lw; ctx.beginPath();
+      ctx.moveTo(o.x1,o.y1); ctx.lineTo(o.x2,o.y2); ctx.stroke();
+    } else if(o.op==='text'){
+      if(!o.text) continue;
+      ctx.fillStyle=o.color.hex; ctx.font=o.size+'px "'+FACE_NAMES[o.font]+'"';
+      const w=measure(o.text,o.font,o.size,o.track);
+      let x = o.cx!==undefined ? o.cx-w/2 : (o.right!==undefined ? o.right-w : o.x);
+      if(o.track){ const tr=(o.track/1000)*o.size;
+        for(const ch of o.text){ ctx.fillText(ch,x,o.y); x+=ctx.measureText(ch).width+tr; }
+      } else ctx.fillText(o.text,x,o.y);
+    }
+  }
+}
+
+/* ============ PDF renderer ============ */
+async function renderPDF(docs){ // docs: array of layout docs -> one PDFDocument
+  const { PDFDocument, cmyk, setCharacterSpacing } = PDFLib;
+  const pdf = await PDFDocument.create();
+  pdf.registerFontkit(fontkit);
+  const emb={};
+  const need=new Set(); docs.forEach(d=>d.ops.forEach(o=>{ if(o.op==='text') need.add(o.font); }));
+  for(const k of need){
+    const bytes=FONT_SLOTS[k].bytes.slice(0);
+    let psName=null; try{ psName=fontkit.create(new Uint8Array(bytes.slice(0))).postscriptName; }catch(e){}
+    emb[k]=await pdf.embedFont(bytes, psName? {customName:psName} : {}); // full embed, original PostScript names
+  }
+  const C = c => cmyk(c.cmyk[0]/100, c.cmyk[1]/100, c.cmyk[2]/100, c.cmyk[3]/100);
+  const pdfW=(f,t,s)=>emb[f].widthOfTextAtSize(t,s);
+  for(const doc of docs){
+    const page=pdf.addPage([doc.W,doc.H]); const H=doc.H;
+    for(const o of doc.ops){
+      if(o.op==='rect'){
+        const opts={x:o.x, y:H-o.y-o.h, width:o.w, height:o.h};
+        if(o.fill) opts.color=C(o.fill);
+        if(o.stroke){ opts.borderColor=C(o.stroke); opts.borderWidth=o.lw; }
+        page.drawRectangle(opts);
+      } else if(o.op==='frame'){
+        const [ox,oy,ow,oh]=o.outer, [ix,iy,iw,ih]=o.inner, fc=C(o.fill);
+        // draw as four filled strips (top band, bottom, left, right)
+        page.drawRectangle({x:ox,y:H-iy,width:ow,height:iy-oy,color:fc});           // top
+        page.drawRectangle({x:ox,y:H-(oy+oh),width:ow,height:(oy+oh)-(iy+ih),color:fc}); // bottom
+        page.drawRectangle({x:ox,y:H-(iy+ih),width:ix-ox,height:ih,color:fc});      // left
+        page.drawRectangle({x:ix+iw,y:H-(iy+ih),width:(ox+ow)-(ix+iw),height:ih,color:fc}); // right
+      } else if(o.op==='line'){
+        page.drawLine({start:{x:o.x1,y:H-o.y1}, end:{x:o.x2,y:H-o.y2}, thickness:o.lw, color:C(o.color)});
+      } else if(o.op==='text'){
+        if(!o.text) continue;
+        const f=o.font, s=o.size, tr=(o.track/1000)*s;
+        const w = pdfW(f,o.text,s) + tr*Math.max(0,o.text.length-1);
+        const x = o.cx!==undefined ? o.cx-w/2 : (o.right!==undefined ? o.right-w : o.x);
+        const y=H-o.y, color=C(o.color);
+        if(tr) page.pushOperators(setCharacterSpacing(tr));
+        page.drawText(o.text,{x,y,size:s,font:emb[f],color});
+        if(tr) page.pushOperators(setCharacterSpacing(0));
+      }
+    }
+  }
+  return pdf.save();
+}
+
+/* ============ Deliverables per release ============ */
+function deliverables(){
+  const fn=filenames(), colors=activeColors();
+  if(state.release==='rc') return [
+    { name:fn.label12, kind:'pdf', docs:()=>[buildLabel12(colors,'rc')] },
+    { name:fn.label5,  kind:'pdf', docs:()=>[buildLabel5(colors,'rc')] },
+    { name:fn.jpg,     kind:'jpg', docs:()=>[buildLabel12(colors,'rc',true)] },
+  ];
+  if(state.release==='soe') return [
+    { name:fn.retail,  kind:'pdf', docs:()=>[buildSOERetail(colors), buildSOEHopper(colors)] },
+    { name:fn.label12, kind:'pdf', docs:()=>[buildLabel12(colors,'soe')] },
+    { name:fn.label5,  kind:'pdf', docs:()=>[buildLabel5(colors,'soe')] },
+    { name:fn.jpg,     kind:'jpg', docs:()=>[buildLabel12(colors,'soe',true)] },
+  ];
+  return [
+    { name:fn.retail,  kind:'pdf', docs:()=>[buildRetailNormal(colors)] },
+    { name:fn.sample,  kind:'pdf', docs:()=>[buildSample(colors)] },
+    { name:fn.label12, kind:'pdf', docs:()=>[buildLabel12(colors,'normal')] },
+    { name:fn.label5,  kind:'pdf', docs:()=>[buildLabel5(colors,'normal')] },
+    { name:fn.jpg,     kind:'jpg', docs:()=>[buildLabel12(colors,'normal',true)] },
+  ];
+}
+
+/* ============ Preview rendering ============ */
+let renderQueued=false;
+function scheduleRender(){ if(renderQueued) return; renderQueued=true; requestAnimationFrame(()=>{ renderQueued=false; renderPreviews(); }); }
+function renderPreviews(){
+  syncState();
+  const host=document.getElementById('previews');
+  const items=deliverables();
+  // rebuild DOM only when count/names change
+  const key=items.map(i=>i.name).join('|');
+  if(host.dataset.key!==key){
+    host.dataset.key=key; host.innerHTML='';
+    items.forEach((it,idx)=>{
+      const d=document.createElement('div'); d.className='prev-item';
+      d.innerHTML='<div class="bar"><span>'+it.name+'</span><button data-idx="'+idx+'">Download</button></div><div class="cv"></div>';
+      host.appendChild(d);
+      d.querySelector('button').addEventListener('click',()=>exportOne(idx));
+    });
+  }
+  const missing=fontsMissing();
+  items.forEach((it,idx)=>{
+    const cvHost=host.children[idx].querySelector('.cv');
+    const docs=it.docs();
+    // ensure a canvas per page
+    while(cvHost.children.length<docs.length){ const c=document.createElement('canvas'); c.className='doc'; c.style.marginBottom='10px'; cvHost.appendChild(c); }
+    while(cvHost.children.length>docs.length) cvHost.removeChild(cvHost.lastChild);
+    docs.forEach((doc,p)=>{
+      const scale = doc.W<400? 2 : Math.min(1.0, (host.clientWidth-70)/doc.W);
+      renderCanvas(doc, cvHost.children[p], scale);
+    });
+  });
+  document.getElementById('fnPreview').textContent = items.map(i=>i.name).join('  \u00b7  ');
+  const warn=document.getElementById('exportWarn');
+  warn.textContent = missing.length? 'Missing fonts for export: '+missing.map(k=>FONT_SLOTS[k].label).join(', ') : '';
+  document.getElementById('dlAll').disabled = missing.length>0;
+  renderFontList();
+}
+
+
+/* ============ CMYK JPEG encoder (baseline, Adobe APP14) ============ */
+const JPEG_ZZ = [0,1,8,16,9,2,3,10,17,24,32,25,18,11,4,5,12,19,26,33,40,48,41,34,27,20,13,6,7,14,21,28,35,42,49,56,57,50,43,36,29,22,15,23,30,37,44,51,58,59,52,45,38,31,39,46,53,60,61,54,47,55,62,63];
+const JPEG_QBASE = [16,11,10,16,24,40,51,61,12,12,14,19,26,58,60,55,14,13,16,24,40,57,69,56,14,17,22,29,51,87,80,62,18,22,37,56,68,109,103,77,24,35,55,64,81,104,113,92,49,64,78,87,103,121,120,101,72,92,95,98,112,100,103,99];
+const JPEG_DC_BITS = [0,1,5,1,1,1,1,1,1,0,0,0,0,0,0,0];
+const JPEG_DC_VALS = [0,1,2,3,4,5,6,7,8,9,10,11];
+const JPEG_AC_BITS = [0,2,1,3,3,2,4,3,5,5,4,4,0,0,1,125];
+const JPEG_AC_VALS = [1,2,3,0,4,17,5,18,33,49,65,6,19,81,97,7,34,113,20,50,129,145,161,8,35,66,177,193,21,82,209,240,36,51,98,114,130,9,10,22,23,24,25,26,37,38,39,40,41,42,52,53,54,55,56,57,58,67,68,69,70,71,72,73,74,83,84,85,86,87,88,89,90,99,100,101,102,103,104,105,106,115,116,117,118,119,120,121,122,131,132,133,134,135,136,137,138,146,147,148,149,150,151,152,153,154,162,163,164,165,166,167,168,169,170,178,179,180,181,182,183,184,185,186,194,195,196,197,198,199,200,201,202,210,211,212,213,214,215,216,217,218,225,226,227,228,229,230,231,232,233,234,241,242,243,244,245,246,247,248,249,250];
+function jpegHuffTable(bits, vals){
+  const codes={}; let code=0, k=0;
+  for(let len=1; len<=16; len++){ for(let i=0;i<bits[len-1];i++){ codes[vals[k++]]=[code,len]; code++; } code<<=1; }
+  return codes;
+}
+function encodeJPEGCMYK(ink, w, h, quality, dpi){
+  // ink: Uint8ClampedArray/Uint8Array length w*h*4, values 0..255 = ink coverage per C,M,Y,K
+  const q = Math.max(1, Math.min(100, Math.round(quality*100)));
+  const scale = q<50 ? 5000/q : 200-2*q;
+  const qt = JPEG_QBASE.map(v=>Math.min(255,Math.max(1,Math.floor((v*scale+50)/100))));
+  const dcT = jpegHuffTable(JPEG_DC_BITS, JPEG_DC_VALS);
+  const acT = jpegHuffTable(JPEG_AC_BITS, JPEG_AC_VALS);
+  const out=[]; // bytes
+  const w16=v=>{ out.push((v>>8)&255, v&255); };
+  const seg=(marker, bytes)=>{ out.push(0xFF, marker); w16(bytes.length+2); out.push(...bytes); };
+  out.push(0xFF,0xD8); // SOI
+  seg(0xE0, [0x4A,0x46,0x49,0x46,0, 1,1, 1, (dpi>>8)&255,dpi&255, (dpi>>8)&255,dpi&255, 0,0]); // JFIF w/ density
+  seg(0xEE, [0x41,0x64,0x6F,0x62,0x65, 0,100, 0,0, 0,0, 0]); // Adobe v100, transform 0 (CMYK direct)
+  { const b=[0]; for(let i=0;i<64;i++) b.push(qt[JPEG_ZZ[i]]); seg(0xDB,b); }
+  { const b=[8]; b.push((h>>8)&255,h&255,(w>>8)&255,w&255,4);
+    for(let c=1;c<=4;c++) b.push(c,0x11,0); seg(0xC0,b); } // SOF0, 4 comps 1x1
+  { const b=[0x00,...JPEG_DC_BITS,...JPEG_DC_VALS]; seg(0xC4,b); }
+  { const b=[0x10,...JPEG_AC_BITS,...JPEG_AC_VALS]; seg(0xC4,b); }
+  { const b=[4]; for(let c=1;c<=4;c++) b.push(c,0x00); b.push(0,63,0); seg(0xDA,b); }
+  // bit writer with FF stuffing
+  let acc=0, nbits=0;
+  const putBits=(code,len)=>{ acc=(acc<<len)|code; nbits+=len;
+    while(nbits>=8){ const b=(acc>>(nbits-8))&255; out.push(b); if(b===0xFF) out.push(0); nbits-=8; } };
+  const category=v=>{ let a=Math.abs(v), n=0; while(a){a>>=1;n++;} return n; };
+  const putVal=(v,n)=>{ if(n===0) return; putBits(v<0 ? (v + (1<<n) - 1) : v, n); };
+  // separable DCT
+  const c8=new Float64Array(8*8);
+  for(let u=0;u<8;u++) for(let x=0;x<8;x++) c8[u*8+x]=Math.cos((2*x+1)*u*Math.PI/16)*(u===0?Math.SQRT1_2:1)*0.5;
+  const blk=new Float64Array(64), tmp=new Float64Array(64), coef=new Int16Array(64);
+  const bw=Math.ceil(w/8), bh=Math.ceil(h/8);
+  const prevDC=[0,0,0,0];
+  for(let by=0; by<bh; by++) for(let bx=0; bx<bw; bx++){
+    for(let c=0;c<4;c++){
+      for(let y=0;y<8;y++) for(let x=0;x<8;x++){
+        const px=Math.min(w-1,bx*8+x), py=Math.min(h-1,by*8+y);
+        blk[y*8+x] = (255 - ink[(py*w+px)*4+c]) - 128; // Adobe CMYK stored inverted
+      }
+      for(let y=0;y<8;y++) for(let u=0;u<8;u++){ let s=0; for(let x=0;x<8;x++) s+=blk[y*8+x]*c8[u*8+x]; tmp[y*8+u]=s; }
+      for(let u=0;u<8;u++) for(let vv=0;vv<8;vv++){ let s=0; for(let y=0;y<8;y++) s+=tmp[y*8+u]*c8[vv*8+y]; coef[vv*8+u]=Math.round(s/qt[vv*8+u]); }
+      // DC
+      const diff=coef[0]-prevDC[c]; prevDC[c]=coef[0];
+      const n=category(diff); const [dc,dl]=dcT[n]; putBits(dc,dl); putVal(diff,n);
+      // AC
+      let run=0;
+      for(let i=1;i<64;i++){
+        const v=coef[JPEG_ZZ[i]];
+        if(v===0){ run++; continue; }
+        while(run>15){ const [zc,zl]=acT[0xF0]; putBits(zc,zl); run-=16; }
+        const nn=category(v); const [ac,al]=acT[(run<<4)|nn]; putBits(ac,al); putVal(v,nn); run=0;
+      }
+      if(run>0){ const [ec,el]=acT[0]; putBits(ec,el); }
+    }
+  }
+  if(nbits>0){ putBits((1<<(8-nbits))-1, 8-nbits); } // pad with 1s
+  out.push(0xFF,0xD9);
+  return new Uint8Array(out);
+}
+/* composite doc ops into a CMYK ink raster via per-op alpha masks */
+function rasterizeCMYK(doc, dpi){
+  const s=dpi/72, w=Math.round(doc.W*s), h=Math.round(doc.H*s);
+  const ink=new Uint8ClampedArray(w*h*4); // starts at 0 ink = white
+  const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+  const ctx=cv.getContext('2d',{willReadFrequently:true});
+  for(const o of doc.ops){
+    const colObj = o.fill||o.stroke||o.color; if(!colObj) continue;
+    if(o.op==='rect' && o.fill && o.stroke){ // split into two passes
+      rasterOp(ctx,s,{...o,stroke:null}); compositeMask(ctx,ink,w,h,o.fill);
+      rasterOp(ctx,s,{...o,fill:null}); compositeMask(ctx,ink,w,h,o.stroke);
+      continue;
+    }
+    rasterOp(ctx,s,o); compositeMask(ctx,ink,w,h,colObj);
+  }
+  return {ink,w,h};
+}
+function rasterOp(ctx,s,o){
+  ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height);
+  ctx.setTransform(s,0,0,s,0,0);
+  ctx.fillStyle='#fff'; ctx.strokeStyle='#fff';
+  if(o.op==='rect'){ if(o.fill) ctx.fillRect(o.x,o.y,o.w,o.h); if(o.stroke){ ctx.lineWidth=o.lw; ctx.strokeRect(o.x,o.y,o.w,o.h); } }
+  else if(o.op==='frame'){ ctx.beginPath(); ctx.rect(...o.outer); ctx.rect(...o.inner); ctx.fill('evenodd'); }
+  else if(o.op==='line'){ ctx.lineWidth=o.lw; ctx.beginPath(); ctx.moveTo(o.x1,o.y1); ctx.lineTo(o.x2,o.y2); ctx.stroke(); }
+  else if(o.op==='text'){ if(!o.text) return;
+    ctx.font=o.size+'px "'+FACE_NAMES[o.font]+'"';
+    const wd=measure(o.text,o.font,o.size,o.track);
+    let x=o.cx!==undefined? o.cx-wd/2 : (o.right!==undefined? o.right-wd : o.x);
+    if(o.track){ const tr=(o.track/1000)*o.size; for(const ch of o.text){ ctx.fillText(ch,x,o.y); x+=ctx.measureText(ch).width+tr; } }
+    else ctx.fillText(o.text,x,o.y);
+  }
+}
+function compositeMask(ctx,ink,w,h,colObj){
+  const a=ctx.getImageData(0,0,w,h).data;
+  const C=colObj.cmyk.map(v=>v*2.55);
+  for(let p=0,i=3;p<w*h;p++,i+=4){
+    const t=a[i]/255; if(t===0) continue;
+    const o=p*4;
+    ink[o]  =ink[o]  +(C[0]-ink[o])*t;
+    ink[o+1]=ink[o+1]+(C[1]-ink[o+1])*t;
+    ink[o+2]=ink[o+2]+(C[2]-ink[o+2])*t;
+    ink[o+3]=ink[o+3]+(C[3]-ink[o+3])*t;
+  }
+}
+
+/* ============ Export ============ */
+function download(name, blob){
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+}
+async function makeBlob(item){
+  if(item.kind==='pdf'){
+    await libsReady;
+    const bytes=await renderPDF(item.docs());
+    return new Blob([bytes],{type:'application/pdf'});
+  }
+  // jpg: 300dpi CMYK (Adobe APP14) composited from exact CMYK values
+  const doc=item.docs()[0];
+  const {ink,w,h}=rasterizeCMYK(doc,300);
+  const bytes=encodeJPEGCMYK(ink,w,h,0.92,300);
+  return new Blob([bytes],{type:'image/jpeg'});
+}
+function drawOpsToCtx(ctx, doc){
+  for(const o of doc.ops){
+    if(o.op==='rect'){ if(o.fill){ctx.fillStyle=o.fill.hex; ctx.fillRect(o.x,o.y,o.w,o.h);} if(o.stroke){ctx.strokeStyle=o.stroke.hex; ctx.lineWidth=o.lw; ctx.strokeRect(o.x,o.y,o.w,o.h);} }
+    else if(o.op==='frame'){ ctx.fillStyle=o.fill.hex; ctx.beginPath(); ctx.rect(...o.outer); ctx.rect(...o.inner); ctx.fill('evenodd'); }
+    else if(o.op==='line'){ ctx.strokeStyle=o.color.hex; ctx.lineWidth=o.lw; ctx.beginPath(); ctx.moveTo(o.x1,o.y1); ctx.lineTo(o.x2,o.y2); ctx.stroke(); }
+    else if(o.op==='text'){ if(!o.text) continue;
+      ctx.fillStyle=o.color.hex; ctx.font=o.size+'px "'+FACE_NAMES[o.font]+'"';
+      const w=measure(o.text,o.font,o.size,o.track);
+      let x=o.cx!==undefined? o.cx-w/2 : (o.right!==undefined? o.right-w : o.x);
+      if(o.track){ const tr=(o.track/1000)*o.size; for(const ch of o.text){ ctx.fillText(ch,x,o.y); x+=ctx.measureText(ch).width+tr; } }
+      else ctx.fillText(o.text,x,o.y);
+    }
+  }
+}
+async function exportOne(idx){
+  const item=deliverables()[idx];
+  try{ download(item.name, await makeBlob(item)); }
+  catch(e){ alert('Export failed: '+e.message); console.error(e); }
+}
+document.getElementById('dlAll').addEventListener('click', async ()=>{
+  await libsReady;
+  const btn=document.getElementById('dlAll'); btn.disabled=true; btn.textContent='Building\u2026';
+  try{
+    const zip=new JSZip();
+    for(const item of deliverables()) zip.file(item.name, await makeBlob(item));
+    download((v('code')||'coffee')+'-'+monthCode()+'-rollout.zip', await zip.generateAsync({type:'blob'}));
+  } catch(e){ alert('Export failed: '+e.message); console.error(e); }
+  btn.disabled=false; btn.textContent='Download All';
+});
+
+/* ============ Form wiring ============ */
+function syncState(){
+  ['line1','line2','line3','flavor','flavorLines','body','finish','process','price','desc','variety','farm','producer','altitude','soeLocation','soeExtraction','soeProcVar','code'].forEach(id=>state[id]=v(id));
+  state.region=v('regionField');
+}
+function releaseChanged(){
+  const r=state.release;
+  document.getElementById('sec-sample').style.display = r==='normal' ? '' : 'none';
+  document.getElementById('sec-soe').style.display = r==='soe' ? '' : 'none';
+  document.getElementById('sec-desc').style.display = r==='rc' ? 'none' : '';
+  document.getElementById('line3Label').textContent = r==='soe' ? 'Line 3 (fixed for SOE)' : 'Line 3 \u00b7 Region';
+  if(r==='soe' && !v('line3').trim()) set('line3','SINGLE ORIGIN ESPRESSO');
+  syncCode(); renderFontList(); scheduleRender();
+}
+document.querySelectorAll('input[name=release]').forEach(el=>el.addEventListener('change',e=>{
+  const prev=state.release; state.release=e.target.value;
+  if(state.release==='soe') set('line3','SINGLE ORIGIN ESPRESSO');
+  else if(prev==='soe' && v('line3')==='SINGLE ORIGIN ESPRESSO') set('line3', v('regionField'));
+  releaseChanged();
+}));
+document.querySelectorAll('input[name=origin]').forEach(el=>el.addEventListener('change',e=>{
+  state.origin=e.target.value; state.originIsAuto=false;
+  document.getElementById('originAuto').textContent='';
+  document.getElementById('custBox').style.display = state.origin==='custom' ? '' : 'none';
+  scheduleRender();
+}));
+['lp','ic','rc'].forEach(p=>{
+  document.getElementById('cu_'+p+'_hex').addEventListener('input',e=>{
+    const c=hexToCmyk(e.target.value);
+    if(c){ ['c','m','y','k'].forEach((ch,i)=>set('cu_'+p+'_'+ch, c[i])); }
+    scheduleRender();
+  });
+  ['c','m','y','k'].forEach(ch=>document.getElementById('cu_'+p+'_'+ch).addEventListener('input',scheduleRender));
+});
+document.querySelectorAll('#form input[type=text], #form textarea').forEach(el=>{
+  el.addEventListener('input',()=>{
+    if(['line1','line2','line3'].includes(el.id)) syncCode();
+    scheduleRender();
+  });
+});
+document.getElementById('month').addEventListener('input',scheduleRender);
+document.getElementById('code').addEventListener('input',scheduleRender);
+document.querySelector('input[name=origin][value=south]').checked=true;
+
+/* defaults */
+(function(){
+  const now=new Date();
+  document.getElementById('month').value = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  releaseChanged();
+})();
+window.addEventListener('resize', scheduleRender);
+</script>
+</body>
+</html>
