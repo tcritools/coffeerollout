@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ACRO — NYM</title>
+<title>ACRO — Temple Coffee</title>
 <link rel="icon" type="image/png" href="/favicon.png">
 <link rel="apple-touch-icon" href="/favicon.png">
 <style>
@@ -99,10 +99,10 @@
 
   <section id="sec-fonts">
     <h2>Fonts <span class="status" id="fontStatus"></span></h2>
-    <div class="drop" id="fontDrop">Fonts load automatically from the CDN. Drop files here to override<br><span style="font-weight:normal; letter-spacing:0; text-transform:none;">TradeGothicLTStd-Bd2.otf &middot; TradeGothicLTStd-BoldExt.otf &middot; TradeGothicLTStd.otf &middot; Helvetica.ttc</span></div>
+    <div class="drop" id="fontDrop">Drop font files here or click<br><span style="font-weight:normal; letter-spacing:0; text-transform:none;">TradeGothicLTStd-Bd2.ttf &middot; TradeGothicLTStd-BoldExt.ttf &middot; TradeGothicLTStd.ttf &middot; Helvetica.ttc</span></div>
     <input type="file" id="fontFile" multiple accept=".otf,.ttf,.ttc" style="display:none">
     <ul class="fontlist" id="fontList"></ul>
-    <div class="hint">Fonts auto-fetch from cdn.shopify.com and cache in this browser. If a CDN fetch fails (offline, CORS, file moved), drop the file manually as a fallback.</div>
+    <div class="hint">Fonts are cached in this browser after the first drop. Helvetica Bold + Light are pulled out of the .ttc automatically (sample cards only).</div>
   </section>
 
   <section id="sec-data">
@@ -290,8 +290,12 @@ const FONT_SLOTS = {
 const FACE_NAMES = { bd2:'TGBd2', bold:'TGBold', boldext:'TGBoldExt', tg:'TGReg', hb:'HelvB', hl:'HelvL' };
 
 function idb(){ return new Promise((res,rej)=>{ try{
-  const r = indexedDB.open('tcri-rollout',1);
-  r.onupgradeneeded = e => e.target.result.createObjectStore('fonts');
+  const r = indexedDB.open('tcri-rollout',2); // v2: bumped to flush old OTF-cached font bytes (CFF embedding bug), now serving TTF
+  r.onupgradeneeded = e => {
+    const db=e.target.result;
+    if(db.objectStoreNames.contains('fonts')) db.deleteObjectStore('fonts'); // drop any stale cached fonts from v1
+    db.createObjectStore('fonts');
+  };
   r.onsuccess = e => res(e.target.result); r.onerror = ()=>rej(r.error);
 } catch(e){ rej(e); } }); }
 async function idbPut(key,val){ try{ const db=await idb(); await new Promise((res,rej)=>{ const t=db.transaction('fonts','readwrite'); t.objectStore('fonts').put(val,key); t.oncomplete=res; t.onerror=()=>rej(t.error); }); }catch(e){} }
@@ -393,21 +397,14 @@ function renderFontList(){
   if(!need.length && !fontsPinnedOpen) document.getElementById('sec-fonts').classList.add('collapsed');
   if(need.length){ document.getElementById('sec-fonts').classList.remove('collapsed'); fontsPinnedOpen=false; }
 }
-const CDN_FONTS = {
-  bd2:     'https://cdn.shopify.com/s/files/1/0084/0826/8890/files/TradeGothicLTStd-Bd2.woff2?v=1780693074',
-  bold:    'https://cdn.shopify.com/s/files/1/0084/0826/8890/files/TradeGothicLTStd-Bold.woff2?v=1784736391',
-  boldext: 'https://cdn.shopify.com/s/files/1/0084/0826/8890/files/TradeGothicLTStd-BoldExt.woff2?v=1780693074',
-  tg:      'https://cdn.shopify.com/s/files/1/0084/0826/8890/files/TradeGothicLTStd.woff2?v=1780693074',
-  hb:      'https://cdn.shopify.com/s/files/1/0084/0826/8890/files/Helvetica-Bold-02.woff2?v=1784736195',
-  hl:      'https://cdn.shopify.com/s/files/1/0084/0826/8890/files/Helvetica-Light-05.woff2?v=1784736195',
-};
 async function autoFetchFonts(){
-  for(const [slot,url] of Object.entries(CDN_FONTS)){
-    if(FONT_SLOTS[slot].bytes) continue;
-    try{
-      const r=await fetch(url);
-      if(r.ok){ const buf=await r.arrayBuffer(); FONT_SLOTS[slot].bytes=buf; await idbPut(slot, buf); }
-    }catch(e){ console.error('CDN font fetch failed', slot, e); }
+  const files=['TradeGothicLTStd-Bold.ttf','TradeGothicLTStd-Bd2.ttf','TradeGothicLTStd-BoldExt.ttf','TradeGothicLTStd.ttf','Helvetica.ttc'];
+  const slotFor = f => /Bd2/i.test(f)?'bd2' : /BoldExt/i.test(f)?'boldext' : /-Bold\./i.test(f)?'bold' : /Helvetica/i.test(f)?null : 'tg';
+  for(const f of files){
+    const s=slotFor(f);
+    if(s && FONT_SLOTS[s].bytes) continue;
+    if(!s && FONT_SLOTS.hb.bytes && FONT_SLOTS.hl.bytes) continue;
+    try{ const r=await fetch('fonts/'+encodeURIComponent(f)); if(r.ok) await ingestFontFile(f, await r.arrayBuffer()); }catch(e){}
   }
 }
 let fontsPinnedOpen=false;
