@@ -42,9 +42,6 @@
   section { border-bottom:1px solid #000; padding:14px 16px; }
   section h2 { font-size:11px; font-weight:bold; letter-spacing:1.5px; text-transform:uppercase; margin-bottom:10px; }
   section h2 .status { font-weight:normal; color:#666; letter-spacing:0; text-transform:none; float:right; }
-  #sec-fonts h2 { cursor:pointer; }
-  #sec-fonts.collapsed .drop, #sec-fonts.collapsed .fontlist, #sec-fonts.collapsed .hint { display:none; }
-  #sec-fonts.collapsed { padding:10px 16px; }
   label.f { display:block; font-size:10px; font-weight:bold; text-transform:uppercase; letter-spacing:1px; margin:8px 0 3px; color:#333; }
   input[type=text], textarea, select, input[type=month], input[type=number] {
     width:100%; border:1px solid #000; padding:6px 8px; font-family:Arial, sans-serif; font-size:13px; background:#fff;
@@ -99,10 +96,8 @@
 
   <section id="sec-fonts">
     <h2>Fonts <span class="status" id="fontStatus"></span></h2>
-    <div class="drop" id="fontDrop">Drop font files here or click<br><span style="font-weight:normal; letter-spacing:0; text-transform:none;">TradeGothicLTStd-Bd2.ttf &middot; TradeGothicLTStd-BoldExt.ttf &middot; TradeGothicLTStd.ttf &middot; Helvetica.ttc</span></div>
-    <input type="file" id="fontFile" multiple accept=".otf,.ttf,.ttc" style="display:none">
     <ul class="fontlist" id="fontList"></ul>
-    <div class="hint">Fonts are cached in this browser after the first drop. Helvetica Bold + Light are pulled out of the .ttc automatically (sample cards only).</div>
+    <div class="hint">Loads automatically from /fonts next to index.html. Helvetica Bold + Light are pulled out of the .ttc automatically (sample cards only).</div>
   </section>
 
   <section id="sec-data">
@@ -205,6 +200,18 @@
     <div class="hint" id="fnPreview"></div>
   </section>
 
+  <section id="sec-mock">
+    <h2>Product Mockups <span class="status" id="mockStatus"></span></h2>
+    <div class="radio-grid" style="margin-top:8px">
+      <label><input type="checkbox" id="mockIncFront">Include Front</label>
+      <label><input type="checkbox" id="mockIncSide">Include Side</label>
+    </div>
+    <div class="radio-grid" style="margin-top:8px">
+      <label><input type="checkbox" id="mockIncBadge">Include Badge (adds Front w/Badge)</label>
+    </div>
+    <div class="hint" id="mockHint">Loads automatically from /images next to index.html (front.jpg, side.jpg, badge.svg). The label is perspective-warped flat onto the photo's label area &mdash; nothing else on the bag changes.</div>
+  </section>
+
   <div id="exportbar">
     <button class="primary" id="dlAll" disabled>Download All</button>
     <div class="warn" id="exportWarn"></div>
@@ -270,6 +277,7 @@ const state = {
   desc:'', variety:'', farm:'', producer:'', region:'', altitude:'',
   soeLocation:'', soeExtraction:'', soeProcVar:'',
   code:'', monthCode:'',
+  mockFront:false, mockSide:false, badge:false,
 };
 function activeColors(){
   if(state.origin!=='custom') return ORIGINS[state.origin];
@@ -288,18 +296,6 @@ const FONT_SLOTS = {
   hl:      {label:'Helvetica Light',        match:null, bytes:null},
 };
 const FACE_NAMES = { bd2:'TGBd2', bold:'TGBold', boldext:'TGBoldExt', tg:'TGReg', hb:'HelvB', hl:'HelvL' };
-
-function idb(){ return new Promise((res,rej)=>{ try{
-  const r = indexedDB.open('tcri-rollout',2); // v2: bumped to flush old OTF-cached font bytes (CFF embedding bug), now serving TTF
-  r.onupgradeneeded = e => {
-    const db=e.target.result;
-    if(db.objectStoreNames.contains('fonts')) db.deleteObjectStore('fonts'); // drop any stale cached fonts from v1
-    db.createObjectStore('fonts');
-  };
-  r.onsuccess = e => res(e.target.result); r.onerror = ()=>rej(r.error);
-} catch(e){ rej(e); } }); }
-async function idbPut(key,val){ try{ const db=await idb(); await new Promise((res,rej)=>{ const t=db.transaction('fonts','readwrite'); t.objectStore('fonts').put(val,key); t.oncomplete=res; t.onerror=()=>rej(t.error); }); }catch(e){} }
-async function idbGet(key){ try{ const db=await idb(); return await new Promise((res,rej)=>{ const t=db.transaction('fonts','readonly'); const q=t.objectStore('fonts').get(key); q.onsuccess=()=>res(q.result||null); q.onerror=()=>rej(q.error); }); }catch(e){ return null; } }
 
 /* TTC face extraction: rebuild standalone sfnt per face */
 function extractTTCFaces(buf){
@@ -354,8 +350,8 @@ async function ingestFontFile(name, buf){
     const faces = extractTTCFaces(buf);
     for(const f of faces){
       const n=f.name.toLowerCase();
-      if(/bold/.test(n) && !/oblique|italic/.test(n)){ FONT_SLOTS.hb.bytes=f.bytes; await idbPut('hb', f.bytes); }
-      else if(/light/.test(n) && !/oblique|italic/.test(n)){ FONT_SLOTS.hl.bytes=f.bytes; await idbPut('hl', f.bytes); }
+      if(/bold/.test(n) && !/oblique|italic/.test(n)){ FONT_SLOTS.hb.bytes=f.bytes; }
+      else if(/light/.test(n) && !/oblique|italic/.test(n)){ FONT_SLOTS.hl.bytes=f.bytes; }
     }
     return;
   }
@@ -370,7 +366,7 @@ async function ingestFontFile(name, buf){
     else if(/helvetica/.test(n)){ if(/bold/.test(n)) slot='hb'; else if(/light/.test(n)) slot='hl'; }
     else if(/trade gothic/.test(n)){ slot = /bold/.test(n) ? 'bold' : 'tg'; }
   }
-  if(slot){ FONT_SLOTS[slot].bytes=buf; await idbPut(slot, buf); }
+  if(slot){ FONT_SLOTS[slot].bytes=buf; }
 }
 async function registerFaces(){
   for(const [k,s] of Object.entries(FONT_SLOTS)){
@@ -393,9 +389,18 @@ function renderFontList(){
     ul.appendChild(li);
   }
   const need=fontsMissing();
-  document.getElementById('fontStatus').textContent = need.length? need.length+' needed for this release type' : 'ready \u2014 click to manage';
-  if(!need.length && !fontsPinnedOpen) document.getElementById('sec-fonts').classList.add('collapsed');
-  if(need.length){ document.getElementById('sec-fonts').classList.remove('collapsed'); fontsPinnedOpen=false; }
+  document.getElementById('fontStatus').textContent = need.length? need.length+' failed to load from /fonts' : 'ready';
+}
+/* Per-asset load diagnostics: check FETCH_ERRORS from the browser console (F12) if
+   /images or /fonts assets don't show up -- it logs the exact HTTP status or error
+   for each file so you can tell a 404 (wrong path/filename/case) from anything else. */
+const FETCH_ERRORS = {};
+async function fetchAsset(path){
+  try{
+    const r = await fetch(path);
+    if(!r.ok){ FETCH_ERRORS[path]='HTTP '+r.status; console.error('[asset load]', path, 'HTTP', r.status); return null; }
+    return r;
+  } catch(e){ FETCH_ERRORS[path]=e.message; console.error('[asset load]', path, e); return null; }
 }
 async function autoFetchFonts(){
   const files=['TradeGothicLTStd-Bold.ttf','TradeGothicLTStd-Bd2.ttf','TradeGothicLTStd-BoldExt.ttf','TradeGothicLTStd.ttf','Helvetica.ttc'];
@@ -404,19 +409,162 @@ async function autoFetchFonts(){
     const s=slotFor(f);
     if(s && FONT_SLOTS[s].bytes) continue;
     if(!s && FONT_SLOTS.hb.bytes && FONT_SLOTS.hl.bytes) continue;
-    try{ const r=await fetch('fonts/'+encodeURIComponent(f)); if(r.ok) await ingestFontFile(f, await r.arrayBuffer()); }catch(e){}
+    const r = await fetchAsset('fonts/'+encodeURIComponent(f));
+    if(r) await ingestFontFile(f, await r.arrayBuffer());
   }
 }
-let fontsPinnedOpen=false;
-document.querySelector('#sec-fonts h2').addEventListener('click',()=>{
-  fontsPinnedOpen = document.getElementById('sec-fonts').classList.contains('collapsed');
-  document.getElementById('sec-fonts').classList.toggle('collapsed');
-});
-(async function restoreFonts(){
-  for(const k of Object.keys(FONT_SLOTS)){ const b=await idbGet(k); if(b) FONT_SLOTS[k].bytes=b; }
+(async function loadFonts(){
   await autoFetchFonts();
   await registerFaces();
 })();
+
+/* ============ Product mockups (12oz label warped onto bag photos) ============ */
+/* Each template is bounded by a `left` and `right` edge curve, given as [x,y] points
+   measured on the 3332x3332 reference photos, ordered top-to-bottom. Two points = a
+   straight edge (front, straight-on shot). More points trace the edge's actual curve
+   (side, 3/4 angle shot) -- the bag's front panel bulges outward, bowing the label's
+   vertical edges even though its top/bottom stay straight. */
+const BAG_TEMPLATES = {
+  front: { label:'Front (straight-on)', w:3332, h:3332,
+    left: [[1216,1645],[1216,2464]],
+    right:[[2106,1645],[2106,2464]], img:null },
+  side:  { label:'Side (3/4 angle)', w:3332, h:3332,
+    left: [[1489,1687],[1502,1788.5],[1510,1890],[1516,1991.5],[1519,2093],[1519,2194.5],[1519,2296],[1518,2397.5],[1518,2499]],
+    right:[[2217,1635],[2231,1730.8],[2240,1826.5],[2246,1922.2],[2248,2018],[2248,2113.8],[2247,2209.5],[2246,2305.2],[2244,2401]], img:null },
+};
+/* Subscribe & Ship Free badge, composited onto the Front mockup only (no warp needed --
+   straight-on shot). Placement measured directly off the Wonderblend front+badge reference
+   photo (3332px space): circular badge centered ~(2688,746), diameter ~920px. */
+const BADGE = { img:null, natW:0, natH:0, x:2243, y:284, w:891 };
+async function loadImageFromUrl(url){
+  const img = new Image();
+  img.src = url;
+  await img.decode();
+  return img;
+}
+async function autoFetchBadgeAsset(){
+  for(const file of ['badge.svg','badge.png']){
+    const r = await fetchAsset('images/'+file);
+    if(r){
+      BADGE.img = await loadImageFromUrl(URL.createObjectURL(await r.blob()));
+      BADGE.natW = BADGE.img.naturalWidth||BADGE.img.width; BADGE.natH = BADGE.img.naturalHeight||BADGE.img.height;
+      return;
+    }
+  }
+}
+document.getElementById('mockIncBadge').addEventListener('change', e=>{ state.badge=e.target.checked; scheduleRender(); });
+(async function loadBadge(){
+  await autoFetchBadgeAsset();
+  renderMockStatus(); scheduleRender();
+})();
+/* Draw the badge onto an already-rendered mockup canvas at its fixed placement. */
+function applyBadge(canvas, outSize){
+  if(!BADGE.img) return canvas;
+  const ctx=canvas.getContext('2d');
+  const scale=outSize/3332;
+  const w=BADGE.w*scale, h=w*(BADGE.natH/BADGE.natW||1);
+  ctx.drawImage(BADGE.img, BADGE.x*scale, BADGE.y*scale, w, h);
+  return canvas;
+}
+async function autoFetchBagAssets(){
+  for(const key of Object.keys(BAG_TEMPLATES)){
+    const r = await fetchAsset('images/'+key+'.jpg');
+    if(r) BAG_TEMPLATES[key].img = await loadImageFromUrl(URL.createObjectURL(await r.blob()));
+  }
+}
+function renderMockStatus(){
+  const keys = Object.keys(BAG_TEMPLATES);
+  const missing = keys.filter(k=>!BAG_TEMPLATES[k].img);
+  document.getElementById('mockStatus').textContent = missing.length
+    ? missing.map(k=>k+' ('+(FETCH_ERRORS['images/'+k+'.jpg']||'?')+')').join(', ')
+    : 'ready';
+  const fc=document.getElementById('mockIncFront'), sc=document.getElementById('mockIncSide'), bc=document.getElementById('mockIncBadge');
+  fc.disabled = !BAG_TEMPLATES.front.img; sc.disabled = !BAG_TEMPLATES.side.img;
+  bc.disabled = !BADGE.img;
+  if(!BAG_TEMPLATES.front.img){ fc.checked=false; state.mockFront=false; }
+  if(!BAG_TEMPLATES.side.img){ sc.checked=false; state.mockSide=false; }
+  if(!BADGE.img){ bc.checked=false; state.badge=false; }
+}
+document.getElementById('mockIncFront').addEventListener('change', e=>{ state.mockFront=e.target.checked; scheduleRender(); });
+document.getElementById('mockIncSide').addEventListener('change', e=>{ state.mockSide=e.target.checked; scheduleRender(); });
+(async function loadBagAssets(){
+  await autoFetchBagAssets();
+  renderMockStatus(); scheduleRender();
+})();
+
+/* ---- quad-to-quad projective mapping (Heckbert's basisToPoints / general2DProjection) ---- */
+function mat3adj(m){ return [
+  m[4]*m[8]-m[5]*m[7], m[2]*m[7]-m[1]*m[8], m[1]*m[5]-m[2]*m[4],
+  m[5]*m[6]-m[3]*m[8], m[0]*m[8]-m[2]*m[6], m[2]*m[3]-m[0]*m[5],
+  m[3]*m[7]-m[4]*m[6], m[1]*m[6]-m[0]*m[7], m[0]*m[4]-m[1]*m[3]
+]; }
+function mat3mul(a,b){ const c=new Array(9);
+  for(let i=0;i<3;i++) for(let j=0;j<3;j++){ let s=0; for(let k=0;k<3;k++) s+=a[i*3+k]*b[k*3+j]; c[i*3+j]=s; }
+  return c; }
+function mat3vec(m,v){ return [ m[0]*v[0]+m[1]*v[1]+m[2]*v[2], m[3]*v[0]+m[4]*v[1]+m[5]*v[2], m[6]*v[0]+m[7]*v[1]+m[8]*v[2] ]; }
+function basisToPoints(x0,y0,x1,y1,x2,y2,x3,y3){
+  const m=[x0,x1,x2, y0,y1,y2, 1,1,1];
+  const v=mat3vec(mat3adj(m),[x3,y3,1]);
+  return mat3mul(m, [v[0],0,0, 0,v[1],0, 0,0,v[2]]);
+}
+function general2DProjection(x0s,y0s,x1s,y1s,x2s,y2s,x3s,y3s, x0d,y0d,x1d,y1d,x2d,y2d,x3d,y3d){
+  const s=basisToPoints(x0s,y0s,x1s,y1s,x2s,y2s,x3s,y3s);
+  const d=basisToPoints(x0d,y0d,x1d,y1d,x2d,y2d,x3d,y3d);
+  return mat3mul(d, mat3adj(s));
+}
+function sampleBilinear(data,w,h,x,y){
+  const x0=Math.floor(x), y0=Math.floor(y), x1=Math.min(w-1,x0+1), y1=Math.min(h-1,y0+1);
+  const fx=x-x0, fy=y-y0, idx=(xx,yy)=>(yy*w+xx)*4;
+  const c00=idx(x0,y0), c10=idx(x1,y0), c01=idx(x0,y1), c11=idx(x1,y1);
+  const lerp=(a,b,t)=>a+(b-a)*t;
+  return [0,1,2].map(ch=>lerp(lerp(data[c00+ch],data[c10+ch],fx), lerp(data[c01+ch],data[c11+ch],fx), fy));
+}
+/* Warp labelDoc onto the bag photo for template `key`, output square canvas of size outSize.
+   Subdivides into horizontal strips between consecutive left/right edge points so curved
+   (bulging) edges are followed rather than a single straight-sided quad. */
+function renderMockup(key, labelDoc, outSize){
+  const tpl=BAG_TEMPLATES[key];
+  const scale=outSize/tpl.w;
+  const canvas=document.createElement('canvas'); canvas.width=outSize; canvas.height=outSize;
+  const ctx=canvas.getContext('2d',{willReadFrequently:true});
+  ctx.drawImage(tpl.img,0,0,outSize,outSize);
+  const left=tpl.left.map(([x,y])=>[x*scale,y*scale]);
+  const right=tpl.right.map(([x,y])=>[x*scale,y*scale]);
+  const n=left.length;
+  const quadW=Math.hypot(right[0][0]-left[0][0], right[0][1]-left[0][1]);
+  const labelScale=Math.max(3, (quadW/labelDoc.W)*1.15);
+  const labelCanvas=document.createElement('canvas');
+  renderCanvas(labelDoc, labelCanvas, labelScale);
+  const lw=labelCanvas.width, lh=labelCanvas.height;
+  const labelData=labelCanvas.getContext('2d',{willReadFrequently:true}).getImageData(0,0,lw,lh).data;
+  const bgImg=ctx.getImageData(0,0,outSize,outSize), bgd=bgImg.data;
+  const feather=1.5;
+  for(let s=0;s<n-1;s++){
+    const y0=s/(n-1)*lh, y1=(s+1)/(n-1)*lh;
+    const TL=left[s], TR=right[s], BR=right[s+1], BL=left[s+1];
+    const M=general2DProjection(0,y0, lw,y0, lw,y1, 0,y1, TL[0],TL[1], TR[0],TR[1], BR[0],BR[1], BL[0],BL[1]);
+    const Minv=mat3adj(M);
+    const xs=[TL[0],TR[0],BR[0],BL[0]], ys=[TL[1],TR[1],BR[1],BL[1]];
+    const minX=Math.max(0,Math.floor(Math.min(...xs))-2), maxX=Math.min(outSize-1,Math.ceil(Math.max(...xs))+2);
+    const minY=Math.max(0,Math.floor(Math.min(...ys))-2), maxY=Math.min(outSize-1,Math.ceil(Math.max(...ys))+2);
+    if(maxX<minX||maxY<minY) continue;
+    for(let y=minY;y<=maxY;y++) for(let x=minX;x<=maxX;x++){
+      const v=mat3vec(Minv,[x+0.5,y+0.5,1]), u=v[0]/v[2], vv=v[1]/v[2];
+      const margin=Math.min(u,lw-u,vv-y0,y1-vv);
+      if(margin<=-feather) continue;
+      const alpha=Math.max(0,Math.min(1, margin/feather+0.5));
+      if(alpha<=0) continue;
+      const uc=Math.min(lw-1,Math.max(0,u)), vc=Math.min(lh-1,Math.max(0,vv));
+      const [lr,lg,lb]=sampleBilinear(labelData,lw,lh,uc,vc);
+      const idx=(y*outSize+x)*4;
+      bgd[idx]  = bgd[idx]  *(1-alpha) + lr*alpha;
+      bgd[idx+1]= bgd[idx+1]*(1-alpha) + lg*alpha;
+      bgd[idx+2]= bgd[idx+2]*(1-alpha) + lb*alpha;
+    }
+  }
+  ctx.putImageData(bgImg,0,0);
+  return canvas;
+}
 
 /* ============ Infosheet parsing ============ */
 function parseCSV(text){
@@ -503,9 +651,6 @@ function hookDrop(id, fn){
   ['dragleave','drop'].forEach(ev=>el.addEventListener(ev,e=>{e.preventDefault(); el.classList.remove('over');}));
   el.addEventListener('drop',e=>fn([...e.dataTransfer.files]));
 }
-document.getElementById('fontDrop').addEventListener('click',()=>document.getElementById('fontFile').click());
-document.getElementById('fontFile').addEventListener('change',async e=>{ for(const f of e.target.files) await ingestFontFile(f.name, await f.arrayBuffer()); await registerFaces(); });
-hookDrop('fontDrop', async files=>{ for(const f of files) await ingestFontFile(f.name, await f.arrayBuffer()); await registerFaces(); });
 
 /* ============ Code + filenames ============ */
 function syncCode(){
@@ -521,13 +666,14 @@ function monthCode(){
 }
 function filenames(){
   const c=v('code')||'XXX', m=monthCode();
-  if(state.release==='soe') return {
+  const mock = { mockFront:c+'-'+m+'-BagMockup-Front.jpg', mockSide:c+'-'+m+'-BagMockup-Side.jpg', mockFrontBadge:c+'-'+m+'-BagMockup-Front-Badge.jpg' };
+  if(state.release==='soe') return Object.assign({
     label12:c+'_SOE-'+m+'-Label-12oz.pdf', label5:c+'_SOE-'+m+'-Label-5lb.pdf',
-    retail:c+'-SOE-'+m+'_RetailCard.pdf', jpg:c+'_SOE-'+m+'-Label-12oz.jpg' };
-  if(state.release==='rc') return {
-    label12:c+'_RC'+m+'-Biotre-12oz.pdf', label5:c+'_RC'+m+'-Biotre-5lb.pdf', jpg:c+'_RC'+m+'-Biotre-12oz.jpg' };
-  return { retail:c+'-'+m+'-RetailCard.pdf', sample:c+'-'+m+'-Samplecard.pdf',
-    label12:c+'-'+m+'-12ozLabel.pdf', label5:c+'-'+m+'-5lbLabel.pdf', jpg:c+'-'+m+'-12ozLabel.jpg' };
+    retail:c+'-SOE-'+m+'_RetailCard.pdf', jpg:c+'_SOE-'+m+'-Label-12oz.jpg' }, mock);
+  if(state.release==='rc') return Object.assign({
+    label12:c+'_RC'+m+'-Biotre-12oz.pdf', label5:c+'_RC'+m+'-Biotre-5lb.pdf', jpg:c+'_RC'+m+'-Biotre-12oz.jpg' }, mock);
+  return Object.assign({ retail:c+'-'+m+'-RetailCard.pdf', sample:c+'-'+m+'-Samplecard.pdf',
+    label12:c+'-'+m+'-12ozLabel.pdf', label5:c+'-'+m+'-5lbLabel.pdf', jpg:c+'-'+m+'-12ozLabel.jpg' }, mock);
 }
 
 /* ============ Layout engine ============ */
@@ -864,18 +1010,27 @@ async function renderPDF(docs){ // docs: array of layout docs -> one PDFDocument
 }
 
 /* ============ Deliverables per release ============ */
+function mockupDeliverables(fn, colors, mode){
+  const out=[];
+  if(state.mockFront && BAG_TEMPLATES.front.img) out.push({ name:fn.mockFront, kind:'mockup', templateKey:'front', docs:()=>[buildLabel12(colors,mode,true)] });
+  if(state.mockSide && BAG_TEMPLATES.side.img)   out.push({ name:fn.mockSide,  kind:'mockup', templateKey:'side',  docs:()=>[buildLabel12(colors,mode,true)] });
+  if(state.badge && BADGE.img && BAG_TEMPLATES.front.img) out.push({ name:fn.mockFrontBadge, kind:'mockup-badge', templateKey:'front', docs:()=>[buildLabel12(colors,mode,true)] });
+  return out;
+}
 function deliverables(){
   const fn=filenames(), colors=activeColors();
   if(state.release==='rc') return [
     { name:fn.label12, kind:'pdf', docs:()=>[buildLabel12(colors,'rc')] },
     { name:fn.label5,  kind:'pdf', docs:()=>[buildLabel5(colors,'rc')] },
     { name:fn.jpg,     kind:'jpg', docs:()=>[buildLabel12(colors,'rc',true)] },
+    ...mockupDeliverables(fn,colors,'rc'),
   ];
   if(state.release==='soe') return [
     { name:fn.retail,  kind:'pdf', docs:()=>[buildSOERetail(colors), buildSOEHopper(colors)] },
     { name:fn.label12, kind:'pdf', docs:()=>[buildLabel12(colors,'soe')] },
     { name:fn.label5,  kind:'pdf', docs:()=>[buildLabel5(colors,'soe')] },
     { name:fn.jpg,     kind:'jpg', docs:()=>[buildLabel12(colors,'soe',true)] },
+    ...mockupDeliverables(fn,colors,'soe'),
   ];
   return [
     { name:fn.retail,  kind:'pdf', docs:()=>[buildRetailNormal(colors)] },
@@ -883,6 +1038,7 @@ function deliverables(){
     { name:fn.label12, kind:'pdf', docs:()=>[buildLabel12(colors,'normal')] },
     { name:fn.label5,  kind:'pdf', docs:()=>[buildLabel5(colors,'normal')] },
     { name:fn.jpg,     kind:'jpg', docs:()=>[buildLabel12(colors,'normal',true)] },
+    ...mockupDeliverables(fn,colors,'normal'),
   ];
 }
 
@@ -912,6 +1068,13 @@ function renderPreviews(){
     while(cvHost.children.length<docs.length){ const c=document.createElement('canvas'); c.className='doc'; c.style.marginBottom='10px'; cvHost.appendChild(c); }
     while(cvHost.children.length>docs.length) cvHost.removeChild(cvHost.lastChild);
     docs.forEach((doc,p)=>{
+      if(it.kind==='mockup'||it.kind==='mockup-badge'){
+        let out=renderMockup(it.templateKey, doc, 640);
+        if(it.kind==='mockup-badge') out=applyBadge(out, 640);
+        const c=cvHost.children[p]; c.width=out.width; c.height=out.height;
+        c.getContext('2d').drawImage(out,0,0);
+        return;
+      }
       const scale = doc.W<400? 2 : Math.min(1.0, (host.clientWidth-70)/doc.W);
       renderCanvas(doc, cvHost.children[p], scale);
     });
@@ -1048,6 +1211,12 @@ async function makeBlob(item){
     await libsReady;
     const bytes=await renderPDF(item.docs());
     return new Blob([bytes],{type:'application/pdf'});
+  }
+  if(item.kind==='mockup'||item.kind==='mockup-badge'){
+    const tpl=BAG_TEMPLATES[item.templateKey];
+    let canvas=renderMockup(item.templateKey, item.docs()[0], tpl.w);
+    if(item.kind==='mockup-badge') canvas=applyBadge(canvas, tpl.w);
+    return await new Promise(res=>canvas.toBlob(b=>res(b), 'image/jpeg', 0.92));
   }
   // jpg: 300dpi CMYK (Adobe APP14) composited from exact CMYK values
   const doc=item.docs()[0];
