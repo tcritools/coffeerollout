@@ -97,7 +97,6 @@
   <section id="sec-fonts">
     <h2>Fonts <span class="status" id="fontStatus"></span></h2>
     <ul class="fontlist" id="fontList"></ul>
-    <div class="hint">Loads automatically from /fonts next to index.html. Helvetica Bold + Light are pulled out of the .ttc automatically (sample cards only).</div>
   </section>
 
   <section id="sec-data">
@@ -132,8 +131,9 @@
       <div class="crow"><span>IC</span><input type="text" id="cu_ic_hex" value="#6a3347"><input type="number" id="cu_ic_c" value="47"><input type="number" id="cu_ic_m" value="84"><input type="number" id="cu_ic_y" value="51"><input type="number" id="cu_ic_k" value="36"></div>
       <div class="crow"><span>RC</span><input type="text" id="cu_rc_hex" value="#63545a"><input type="number" id="cu_rc_c" value="58"><input type="number" id="cu_rc_m" value="62"><input type="number" id="cu_rc_y" value="50"><input type="number" id="cu_rc_k" value="28"></div>
       <div class="hint">Hex drives the preview and label JPG. CMYK drives the PDFs. Editing hex refills CMYK with a naive conversion; override the CMYK numbers with real print values.</div>
+      <div class="origin-note hint">LP = label printer compensated color (label PDFs). IC = intended color (retail card, sample card, hopper cards, label JPG). RC = Roaster's Choice frame color.</div>
     </div>
-    <div class="origin-note hint">LP = label printer compensated color (label PDFs). IC = intended color (retail card, sample card, hopper cards, label JPG). RC = Roaster's Choice frame color.</div>
+
   </section>
 
   <section>
@@ -209,7 +209,6 @@
     <div class="radio-grid" style="margin-top:8px">
       <label><input type="checkbox" id="mockIncBadge">Include Badge (adds Front w/Badge)</label>
     </div>
-    <div class="hint" id="mockHint">Loads automatically from /images next to index.html (front.jpg, side.jpg, badge.svg). The label is perspective-warped flat onto the photo's label area &mdash; nothing else on the bag changes.</div>
   </section>
 
   <div id="exportbar">
@@ -655,8 +654,7 @@ function hookDrop(id, fn){
 /* ============ Code + filenames ============ */
 function syncCode(){
   const init = s => s.split(/\s+/).map(w=>w.replace(/[^A-Za-z0-9]/g,'')[0]||'').join('');
-  let code = init(v('line1')) + init(v('line2'));
-  if(state.release==='normal') code += init(v('line3'));
+  const code = init(v('line1')) + init(v('line2'));
   set('code', code.toUpperCase());
 }
 function monthCode(){
@@ -666,14 +664,16 @@ function monthCode(){
 }
 function filenames(){
   const c=v('code')||'XXX', m=monthCode();
-  const mock = { mockFront:c+'-'+m+'-BagMockup-Front.jpg', mockSide:c+'-'+m+'-BagMockup-Side.jpg', mockFrontBadge:c+'-'+m+'-BagMockup-Front-Badge.jpg' };
+  const tag = state.release==='rc' ? '_RC' : state.release==='soe' ? '_SOE' : '';
+  const p = c+tag+'_'+m+'-';
+  const mock = { mockFront:p+'BagFront.jpg', mockSide:p+'BagSide.jpg', mockFrontBadge:p+'BagBadge.jpg' };
   if(state.release==='soe') return Object.assign({
-    label12:c+'_SOE-'+m+'-Label-12oz.pdf', label5:c+'_SOE-'+m+'-Label-5lb.pdf',
-    retail:c+'-SOE-'+m+'_RetailCard.pdf', jpg:c+'_SOE-'+m+'-Label-12oz.jpg' }, mock);
+    label12:p+'12ozLabel.pdf', label5:p+'5lbLabel.pdf',
+    retail:p+'RetailCard.pdf', jpg:p+'12ozLabel.jpg' }, mock);
   if(state.release==='rc') return Object.assign({
-    label12:c+'_RC'+m+'-Biotre-12oz.pdf', label5:c+'_RC'+m+'-Biotre-5lb.pdf', jpg:c+'_RC'+m+'-Biotre-12oz.jpg' }, mock);
-  return Object.assign({ retail:c+'-'+m+'-RetailCard.pdf', sample:c+'-'+m+'-Samplecard.pdf',
-    label12:c+'-'+m+'-12ozLabel.pdf', label5:c+'-'+m+'-5lbLabel.pdf', jpg:c+'-'+m+'-12ozLabel.jpg' }, mock);
+    label12:p+'12ozLabel.pdf', label5:p+'5lbLabel.pdf', jpg:p+'12ozLabel.jpg' }, mock);
+  return Object.assign({ retail:p+'RetailCard.pdf', sample:p+'SampleCard.pdf',
+    label12:p+'12ozLabel.pdf', label5:p+'5lbLabel.pdf', jpg:p+'12ozLabel.jpg' }, mock);
 }
 
 /* ============ Layout engine ============ */
