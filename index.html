@@ -430,8 +430,8 @@ const BAG_TEMPLATES = {
     left: [[1216,1645],[1216,2464]],
     right:[[2106,1645],[2106,2464]], img:null },
   side:  { label:'Side (3/4 angle)', file:'side.jpg', w:3332, h:3332,
-    left: [[1489,1687],[1502,1788.5],[1510,1890],[1516,1991.5],[1519,2093],[1519,2194.5],[1519,2296],[1518,2397.5],[1518,2499]],
-    right:[[2217,1635],[2231,1730.8],[2240,1826.5],[2246,1922.2],[2248,2018],[2248,2113.8],[2247,2209.5],[2246,2305.2],[2244,2401]], img:null },
+    left: [[1489,1687],[1493,1720.8],[1497,1754.7],[1502,1788.5],[1504,1822.3],[1507,1856.2],[1510,1890],[1512,1923.8],[1514,1957.7],[1516,1991.5],[1517,2025.3],[1518,2059.2],[1519,2093],[1519,2126.8],[1519,2160.7],[1519,2194.5],[1519,2228.3],[1519,2262.2],[1519,2296],[1519,2329.8],[1519,2363.7],[1518,2397.5],[1518,2431.3],[1518,2465.2],[1518,2499]],
+    right:[[2217,1635],[2217,1666.9],[2227,1698.8],[2231,1730.8],[2234,1762.7],[2237,1794.6],[2240,1826.5],[2242,1858.4],[2244,1890.3],[2246,1922.2],[2246,1954.2],[2247,1986.1],[2248,2018],[2248,2049.9],[2248,2081.8],[2248,2113.8],[2248,2145.7],[2248,2177.6],[2247,2209.5],[2247,2241.4],[2246,2273.3],[2246,2305.2],[2245,2337.2],[2245,2369.1],[2244,2401]], img:null },
   frontBadge: { label:'Front w/ Badge', file:'badge.jpg', w:3332, h:3332,
     left: [[1216,1645],[1216,2464]],
     right:[[2106,1645],[2106,2464]], img:null },
@@ -516,7 +516,8 @@ function renderMockup(key, labelDoc, outSize){
   const lw=labelCanvas.width, lh=labelCanvas.height;
   const labelData=labelCanvas.getContext('2d',{willReadFrequently:true}).getImageData(0,0,lw,lh).data;
   const bgImg=ctx.getImageData(0,0,outSize,outSize), bgd=bgImg.data;
-  const feather=1.5;
+  const SS=3, SS2=SS*SS;
+  const offs=[]; for(let j=0;j<SS;j++) for(let i=0;i<SS;i++) offs.push([(i+0.5)/SS-0.5,(j+0.5)/SS-0.5]);
   for(let s=0;s<n-1;s++){
     const y0=s/(n-1)*lh, y1=(s+1)/(n-1)*lh;
     const TL=left[s], TR=right[s], BR=right[s+1], BL=left[s+1];
@@ -528,15 +529,18 @@ function renderMockup(key, labelDoc, outSize){
     if(maxX<minX||maxY<minY) continue;
     const isFirst=s===0, isLast=s===n-2;
     for(let y=minY;y<=maxY;y++) for(let x=minX;x<=maxX;x++){
-      const v=mat3vec(Minv,[x+0.5,y+0.5,1]), u=v[0]/v[2], vv=v[1]/v[2];
-      const topM = isFirst ? (vv-y0) : Infinity;
-      const botM = isLast ? (y1-vv) : Infinity;
-      const margin=Math.min(u,lw-u,topM,botM);
-      if(margin<=-feather) continue;
-      const alpha=Math.max(0,Math.min(1, margin/feather+0.5));
-      if(alpha<=0) continue;
-      const uc=Math.min(lw-1,Math.max(0,u)), vc=Math.min(lh-1,Math.max(0,vv));
-      const [lr,lg,lb]=sampleBilinear(labelData,lw,lh,uc,vc);
+      let rAcc=0,gAcc=0,bAcc=0,cov=0;
+      for(const [ox,oy] of offs){
+        const v=mat3vec(Minv,[x+0.5+ox,y+0.5+oy,1]), u=v[0]/v[2], vv=v[1]/v[2];
+        if(u<0||u>lw||vv<0||vv>lh) continue;
+        if(isFirst && vv<y0) continue;
+        if(isLast && vv>y1) continue;
+        const uc=Math.min(lw-1,Math.max(0,u)), vc=Math.min(lh-1,Math.max(0,vv));
+        const [lr,lg,lb]=sampleBilinear(labelData,lw,lh,uc,vc);
+        rAcc+=lr; gAcc+=lg; bAcc+=lb; cov++;
+      }
+      if(cov===0) continue;
+      const alpha=cov/SS2, lr=rAcc/cov, lg=gAcc/cov, lb=bAcc/cov;
       const idx=(y*outSize+x)*4;
       bgd[idx]  = bgd[idx]  *(1-alpha) + lr*alpha;
       bgd[idx+1]= bgd[idx+1]*(1-alpha) + lg*alpha;
