@@ -101,8 +101,8 @@
 
   <section id="sec-data">
     <h2>Infosheet</h2>
-    <div class="drop" id="dataDrop">Drop infosheet CSV or XLSX here or click</div>
-    <input type="file" id="dataFile" accept=".csv,.xlsx" style="display:none">
+    <div class="drop" id="dataDrop">Drop infosheet CSV, XLSX, or .gsheet here or click</div>
+    <input type="file" id="dataFile" accept=".csv,.xlsx,.gsheet" style="display:none">
     <div class="hint" id="dataStatus">Nothing loaded. All fields below are editable either way.</div>
   </section>
 
@@ -389,6 +389,7 @@ function renderFontList(){
   }
   const need=fontsMissing();
   document.getElementById('fontStatus').textContent = need.length? need.length+' failed to load from /fonts' : 'ready';
+  document.getElementById('sec-fonts').style.display = need.length? '' : 'none';
 }
 /* Per-asset load diagnostics: check FETCH_ERRORS from the browser console (F12) if
    /images or /fonts assets don't show up -- it logs the exact HTTP status or error
@@ -634,7 +635,10 @@ hookDrop('dataDrop', files=>{ if(files[0]) loadData(files[0]); });
 async function loadData(file){
   await libsReady;
   let rows;
-  if(/\.xlsx$/i.test(file.name)){
+  if(/\.gsheet$/i.test(file.name)){
+    rows = await loadGSheet(file);
+    if(!rows) return;
+  } else if(/\.xlsx$/i.test(file.name)){
     const wb = XLSX.read(await file.arrayBuffer(), {type:'array'});
     rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, raw:false, defval:''});
   } else {
@@ -642,6 +646,31 @@ async function loadData(file){
   }
   applyInfosheet(rows);
   document.getElementById('dataStatus').textContent = 'Loaded: '+file.name;
+}
+/* .gsheet files are just a small JSON pointer Google Drive creates locally (url/doc_id) --
+   no actual cell data lives in them. Pull the sheet ID out and fetch its public CSV export
+   instead, so this only works if the sheet is shared "Anyone with the link – Viewer". */
+async function loadGSheet(file){
+  const status=document.getElementById('dataStatus');
+  let id=null;
+  try{
+    const json=JSON.parse(await file.text());
+    id = json.doc_id || (json.resource_id||'').split('#').pop() || (json.url&&(json.url.match(/[-\w]{25,}/)||[])[0]);
+  } catch(e){}
+  if(!id){ status.textContent='Could not read a sheet ID out of '+file.name; return null; }
+  const url='https://docs.google.com/spreadsheets/d/'+id+'/export?format=csv';
+  try{
+    const r=await fetch(url);
+    const text=await r.text();
+    if(!r.ok || /^\s*<(!doctype|html)/i.test(text)){
+      status.textContent='Sheet not accessible -- share it as "Anyone with the link \u2013 Viewer", then retry.';
+      return null;
+    }
+    return parseCSV(text);
+  } catch(e){
+    status.textContent='Could not reach that sheet (network/CORS). Try "Anyone with the link" sharing, or drop a CSV/XLSX export instead.';
+    return null;
+  }
 }
 function hookDrop(id, fn){
   const el=document.getElementById(id);
