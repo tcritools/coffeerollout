@@ -430,8 +430,8 @@ const BAG_TEMPLATES = {
     left: [[1216,1645],[1216,2464]],
     right:[[2106,1645],[2106,2464]], img:null },
   side:  { label:'Side (3/4 angle)', file:'side.jpg', w:3332, h:3332,
-    left: [[1489,1687],[1493,1720.8],[1497,1754.7],[1502,1788.5],[1504,1822.3],[1507,1856.2],[1510,1890],[1512,1923.8],[1514,1957.7],[1516,1991.5],[1517,2025.3],[1518,2059.2],[1519,2093],[1519,2126.8],[1519,2160.7],[1519,2194.5],[1519,2228.3],[1519,2262.2],[1519,2296],[1519,2329.8],[1519,2363.7],[1518,2397.5],[1518,2431.3],[1518,2465.2],[1518,2499]],
-    right:[[2217,1635],[2217,1666.9],[2227,1698.8],[2231,1730.8],[2234,1762.7],[2237,1794.6],[2240,1826.5],[2242,1858.4],[2244,1890.3],[2246,1922.2],[2246,1954.2],[2247,1986.1],[2248,2018],[2248,2049.9],[2248,2081.8],[2248,2113.8],[2248,2145.7],[2248,2177.6],[2247,2209.5],[2247,2241.4],[2246,2273.3],[2246,2305.2],[2245,2337.2],[2245,2369.1],[2244,2401]], img:null },
+    left: [[1489,1687],[1495.2,1737.8],[1501.2,1788.5],[1506.2,1839.2],[1510.1,1890],[1513.2,1940.8],[1515.6,1991.5],[1517.2,2042.2],[1518.3,2093],[1519,2143.8],[1519.2,2194.5],[1519.3,2245.2],[1519.1,2296],[1518.9,2346.8],[1518.8,2397.5],[1518.8,2448.2],[1518,2499]],
+    right:[[2217,1635],[2225,1682.9],[2231.1,1730.8],[2236.1,1778.6],[2240,1826.5],[2243.1,1874.4],[2245.3,1922.2],[2246.9,1970.1],[2247.8,2018],[2248.2,2065.9],[2248.1,2113.8],[2247.8,2161.6],[2247.2,2209.5],[2246.4,2257.4],[2245.7,2305.2],[2245,2353.1],[2244,2401]], img:null },
   frontBadge: { label:'Front w/ Badge', file:'badge.jpg', w:3332, h:3332,
     left: [[1216,1645],[1216,2464]],
     right:[[2106,1645],[2106,2464]], img:null },
@@ -515,37 +515,50 @@ function renderMockup(key, labelDoc, outSize){
   renderCanvas(labelDoc, labelCanvas, labelScale);
   const lw=labelCanvas.width, lh=labelCanvas.height;
   const labelData=labelCanvas.getContext('2d',{willReadFrequently:true}).getImageData(0,0,lw,lh).data;
-  const bgImg=ctx.getImageData(0,0,outSize,outSize), bgd=bgImg.data;
+
+  // Overall bbox across every strip, padded -- accumulate all strips' contributions here
+  // BEFORE touching the background, so a pixel straddling an interior seam gets exactly
+  // one blend at the end instead of being partially painted by each neighboring strip in turn.
+  const allX=[...left,...right].map(p=>p[0]), allY=[...left,...right].map(p=>p[1]);
+  const bx0=Math.max(0,Math.floor(Math.min(...allX))-2), bx1=Math.min(outSize-1,Math.ceil(Math.max(...allX))+2);
+  const by0=Math.max(0,Math.floor(Math.min(...allY))-2), by1=Math.min(outSize-1,Math.ceil(Math.max(...allY))+2);
+  const bw=bx1-bx0+1, bh=by1-by0+1;
+  const accR=new Float32Array(bw*bh), accG=new Float32Array(bw*bh), accB=new Float32Array(bw*bh), accCov=new Float32Array(bw*bh);
+
   const SS=3, SS2=SS*SS;
   const offs=[]; for(let j=0;j<SS;j++) for(let i=0;i<SS;i++) offs.push([(i+0.5)/SS-0.5,(j+0.5)/SS-0.5]);
   for(let s=0;s<n-1;s++){
-    const y0=s/(n-1)*lh, y1=(s+1)/(n-1)*lh;
+    const y0=s/(n-1)*lh, y1=(s+1)/(n-1)*lh; // half-open [y0,y1) except the very last strip includes y1
+    const isLast=s===n-2;
     const TL=left[s], TR=right[s], BR=right[s+1], BL=left[s+1];
     const M=general2DProjection(0,y0, lw,y0, lw,y1, 0,y1, TL[0],TL[1], TR[0],TR[1], BR[0],BR[1], BL[0],BL[1]);
     const Minv=mat3adj(M);
     const xs=[TL[0],TR[0],BR[0],BL[0]], ys=[TL[1],TR[1],BR[1],BL[1]];
-    const minX=Math.max(0,Math.floor(Math.min(...xs))-2), maxX=Math.min(outSize-1,Math.ceil(Math.max(...xs))+2);
-    const minY=Math.max(0,Math.floor(Math.min(...ys))-2), maxY=Math.min(outSize-1,Math.ceil(Math.max(...ys))+2);
+    const minX=Math.max(bx0,Math.floor(Math.min(...xs))-2), maxX=Math.min(bx1,Math.ceil(Math.max(...xs))+2);
+    const minY=Math.max(by0,Math.floor(Math.min(...ys))-2), maxY=Math.min(by1,Math.ceil(Math.max(...ys))+2);
     if(maxX<minX||maxY<minY) continue;
-    const isFirst=s===0, isLast=s===n-2;
     for(let y=minY;y<=maxY;y++) for(let x=minX;x<=maxX;x++){
-      let rAcc=0,gAcc=0,bAcc=0,cov=0;
+      const bi=(y-by0)*bw+(x-bx0);
       for(const [ox,oy] of offs){
         const v=mat3vec(Minv,[x+0.5+ox,y+0.5+oy,1]), u=v[0]/v[2], vv=v[1]/v[2];
-        if(u<0||u>lw||vv<0||vv>lh) continue;
-        if(isFirst && vv<y0) continue;
-        if(isLast && vv>y1) continue;
-        const uc=Math.min(lw-1,Math.max(0,u)), vc=Math.min(lh-1,Math.max(0,vv));
-        const [lr,lg,lb]=sampleBilinear(labelData,lw,lh,uc,vc);
-        rAcc+=lr; gAcc+=lg; bAcc+=lb; cov++;
+        if(u<0||u>lw) continue;
+        if(vv<y0) continue;               // strictly belongs to an earlier strip
+        if(isLast ? vv>y1 : vv>=y1) continue; // strictly belongs to the next strip (half-open)
+        const [lr,lg,lb]=sampleBilinear(labelData,lw,lh,Math.min(u,lw-1e-3),Math.min(vv,lh-1e-3));
+        accR[bi]+=lr; accG[bi]+=lg; accB[bi]+=lb; accCov[bi]++;
       }
-      if(cov===0) continue;
-      const alpha=cov/SS2, lr=rAcc/cov, lg=gAcc/cov, lb=bAcc/cov;
-      const idx=(y*outSize+x)*4;
-      bgd[idx]  = bgd[idx]  *(1-alpha) + lr*alpha;
-      bgd[idx+1]= bgd[idx+1]*(1-alpha) + lg*alpha;
-      bgd[idx+2]= bgd[idx+2]*(1-alpha) + lb*alpha;
     }
+  }
+  const bgImg=ctx.getImageData(0,0,outSize,outSize), bgd=bgImg.data;
+  for(let y=0;y<bh;y++) for(let x=0;x<bw;x++){
+    const bi=y*bw+x, cov=accCov[bi];
+    if(cov<=0) continue;
+    const alpha=Math.min(1,cov/SS2);
+    const lr=accR[bi]/cov, lg=accG[bi]/cov, lb=accB[bi]/cov;
+    const idx=((y+by0)*outSize+(x+bx0))*4;
+    bgd[idx]  = bgd[idx]  *(1-alpha) + lr*alpha;
+    bgd[idx+1]= bgd[idx+1]*(1-alpha) + lg*alpha;
+    bgd[idx+2]= bgd[idx+2]*(1-alpha) + lb*alpha;
   }
   ctx.putImageData(bgImg,0,0);
   return canvas;
