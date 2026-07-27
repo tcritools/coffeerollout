@@ -422,70 +422,49 @@ async function autoFetchFonts(){
    measured on the 3332x3332 reference photos, ordered top-to-bottom. Two points = a
    straight edge (front, straight-on shot). More points trace the edge's actual curve
    (side, 3/4 angle shot) -- the bag's front panel bulges outward, bowing the label's
-   vertical edges even though its top/bottom stay straight. */
+   vertical edges even though its top/bottom stay straight.
+   frontBadge reuses Front's straight quad (badge doesn't move the label) but loads a
+   separate photo (badge.jpg) that already has the Subscribe & Ship Free badge baked in. */
 const BAG_TEMPLATES = {
-  front: { label:'Front (straight-on)', w:3332, h:3332,
+  front: { label:'Front (straight-on)', file:'front.jpg', w:3332, h:3332,
     left: [[1216,1645],[1216,2464]],
     right:[[2106,1645],[2106,2464]], img:null },
-  side:  { label:'Side (3/4 angle)', w:3332, h:3332,
+  side:  { label:'Side (3/4 angle)', file:'side.jpg', w:3332, h:3332,
     left: [[1489,1687],[1502,1788.5],[1510,1890],[1516,1991.5],[1519,2093],[1519,2194.5],[1519,2296],[1518,2397.5],[1518,2499]],
     right:[[2217,1635],[2231,1730.8],[2240,1826.5],[2246,1922.2],[2248,2018],[2248,2113.8],[2247,2209.5],[2246,2305.2],[2244,2401]], img:null },
+  frontBadge: { label:'Front w/ Badge', file:'badge.jpg', w:3332, h:3332,
+    left: [[1216,1645],[1216,2464]],
+    right:[[2106,1645],[2106,2464]], img:null },
 };
-/* Subscribe & Ship Free badge, composited onto the Front mockup only (no warp needed --
-   straight-on shot). Placement measured directly off the Wonderblend front+badge reference
-   photo (3332px space): circular badge centered ~(2688,746), diameter ~920px. */
-const BADGE = { img:null, natW:0, natH:0, x:2243, y:284, w:891 };
 async function loadImageFromUrl(url){
   const img = new Image();
   img.src = url;
   await img.decode();
   return img;
 }
-async function autoFetchBadgeAsset(){
-  for(const file of ['badge.svg','badge.png']){
-    const r = await fetchAsset('images/'+file);
-    if(r){
-      BADGE.img = await loadImageFromUrl(URL.createObjectURL(await r.blob()));
-      BADGE.natW = BADGE.img.naturalWidth||BADGE.img.width; BADGE.natH = BADGE.img.naturalHeight||BADGE.img.height;
-      return;
-    }
-  }
-}
-document.getElementById('mockIncBadge').addEventListener('change', e=>{ state.badge=e.target.checked; scheduleRender(); });
-(async function loadBadge(){
-  await autoFetchBadgeAsset();
-  renderMockStatus(); scheduleRender();
-})();
-/* Draw the badge onto an already-rendered mockup canvas at its fixed placement. */
-function applyBadge(canvas, outSize){
-  if(!BADGE.img) return canvas;
-  const ctx=canvas.getContext('2d');
-  const scale=outSize/3332;
-  const w=BADGE.w*scale, h=w*(BADGE.natH/BADGE.natW||1);
-  ctx.drawImage(BADGE.img, BADGE.x*scale, BADGE.y*scale, w, h);
-  return canvas;
-}
 async function autoFetchBagAssets(){
   for(const key of Object.keys(BAG_TEMPLATES)){
-    const r = await fetchAsset('images/'+key+'.jpg');
-    if(r) BAG_TEMPLATES[key].img = await loadImageFromUrl(URL.createObjectURL(await r.blob()));
+    const tpl=BAG_TEMPLATES[key];
+    const r = await fetchAsset('images/'+tpl.file);
+    if(r) tpl.img = await loadImageFromUrl(URL.createObjectURL(await r.blob()));
   }
 }
 function renderMockStatus(){
   const keys = Object.keys(BAG_TEMPLATES);
   const missing = keys.filter(k=>!BAG_TEMPLATES[k].img);
   document.getElementById('mockStatus').textContent = missing.length
-    ? missing.map(k=>k+' ('+(FETCH_ERRORS['images/'+k+'.jpg']||'?')+')').join(', ')
+    ? missing.map(k=>BAG_TEMPLATES[k].file+' ('+(FETCH_ERRORS['images/'+BAG_TEMPLATES[k].file]||'?')+')').join(', ')
     : 'ready';
   const fc=document.getElementById('mockIncFront'), sc=document.getElementById('mockIncSide'), bc=document.getElementById('mockIncBadge');
   fc.disabled = !BAG_TEMPLATES.front.img; sc.disabled = !BAG_TEMPLATES.side.img;
-  bc.disabled = !BADGE.img;
+  bc.disabled = !BAG_TEMPLATES.frontBadge.img;
   if(!BAG_TEMPLATES.front.img){ fc.checked=false; state.mockFront=false; }
   if(!BAG_TEMPLATES.side.img){ sc.checked=false; state.mockSide=false; }
-  if(!BADGE.img){ bc.checked=false; state.badge=false; }
+  if(!BAG_TEMPLATES.frontBadge.img){ bc.checked=false; state.badge=false; }
 }
 document.getElementById('mockIncFront').addEventListener('change', e=>{ state.mockFront=e.target.checked; scheduleRender(); });
 document.getElementById('mockIncSide').addEventListener('change', e=>{ state.mockSide=e.target.checked; scheduleRender(); });
+document.getElementById('mockIncBadge').addEventListener('change', e=>{ state.badge=e.target.checked; scheduleRender(); });
 (async function loadBagAssets(){
   await autoFetchBagAssets();
   renderMockStatus(); scheduleRender();
@@ -547,9 +526,12 @@ function renderMockup(key, labelDoc, outSize){
     const minX=Math.max(0,Math.floor(Math.min(...xs))-2), maxX=Math.min(outSize-1,Math.ceil(Math.max(...xs))+2);
     const minY=Math.max(0,Math.floor(Math.min(...ys))-2), maxY=Math.min(outSize-1,Math.ceil(Math.max(...ys))+2);
     if(maxX<minX||maxY<minY) continue;
+    const isFirst=s===0, isLast=s===n-2;
     for(let y=minY;y<=maxY;y++) for(let x=minX;x<=maxX;x++){
       const v=mat3vec(Minv,[x+0.5,y+0.5,1]), u=v[0]/v[2], vv=v[1]/v[2];
-      const margin=Math.min(u,lw-u,vv-y0,y1-vv);
+      const topM = isFirst ? (vv-y0) : Infinity;
+      const botM = isLast ? (y1-vv) : Infinity;
+      const margin=Math.min(u,lw-u,topM,botM);
       if(margin<=-feather) continue;
       const alpha=Math.max(0,Math.min(1, margin/feather+0.5));
       if(alpha<=0) continue;
@@ -1014,7 +996,7 @@ function mockupDeliverables(fn, colors, mode){
   const out=[];
   if(state.mockFront && BAG_TEMPLATES.front.img) out.push({ name:fn.mockFront, kind:'mockup', templateKey:'front', docs:()=>[buildLabel12(colors,mode,true)] });
   if(state.mockSide && BAG_TEMPLATES.side.img)   out.push({ name:fn.mockSide,  kind:'mockup', templateKey:'side',  docs:()=>[buildLabel12(colors,mode,true)] });
-  if(state.badge && BADGE.img && BAG_TEMPLATES.front.img) out.push({ name:fn.mockFrontBadge, kind:'mockup-badge', templateKey:'front', docs:()=>[buildLabel12(colors,mode,true)] });
+  if(state.badge && BAG_TEMPLATES.frontBadge.img) out.push({ name:fn.mockFrontBadge, kind:'mockup', templateKey:'frontBadge', docs:()=>[buildLabel12(colors,mode,true)] });
   return out;
 }
 function deliverables(){
@@ -1068,9 +1050,8 @@ function renderPreviews(){
     while(cvHost.children.length<docs.length){ const c=document.createElement('canvas'); c.className='doc'; c.style.marginBottom='10px'; cvHost.appendChild(c); }
     while(cvHost.children.length>docs.length) cvHost.removeChild(cvHost.lastChild);
     docs.forEach((doc,p)=>{
-      if(it.kind==='mockup'||it.kind==='mockup-badge'){
-        let out=renderMockup(it.templateKey, doc, 640);
-        if(it.kind==='mockup-badge') out=applyBadge(out, 640);
+      if(it.kind==='mockup'){
+        const out=renderMockup(it.templateKey, doc, 640);
         const c=cvHost.children[p]; c.width=out.width; c.height=out.height;
         c.getContext('2d').drawImage(out,0,0);
         return;
@@ -1212,10 +1193,9 @@ async function makeBlob(item){
     const bytes=await renderPDF(item.docs());
     return new Blob([bytes],{type:'application/pdf'});
   }
-  if(item.kind==='mockup'||item.kind==='mockup-badge'){
+  if(item.kind==='mockup'){
     const tpl=BAG_TEMPLATES[item.templateKey];
-    let canvas=renderMockup(item.templateKey, item.docs()[0], tpl.w);
-    if(item.kind==='mockup-badge') canvas=applyBadge(canvas, tpl.w);
+    const canvas=renderMockup(item.templateKey, item.docs()[0], tpl.w);
     return await new Promise(res=>canvas.toBlob(b=>res(b), 'image/jpeg', 0.92));
   }
   // jpg: 300dpi CMYK (Adobe APP14) composited from exact CMYK values
