@@ -1331,7 +1331,8 @@ document.querySelector('input[name=origin][value=south]').checked=true;
 /* defaults */
 (function(){
   const now=new Date();
-  document.getElementById('month').value = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  const next=new Date(now.getFullYear(), now.getMonth()+1, 1); // first of next month (rolls Dec -> Jan of next year)
+  document.getElementById('month').value = next.getFullYear()+'-'+String(next.getMonth()+1).padStart(2,'0');
   releaseChanged();
 })();
 window.addEventListener('resize', scheduleRender);
