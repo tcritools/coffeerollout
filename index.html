@@ -808,7 +808,8 @@ function buildRetailNormal(colors){
     ops.push(T(v('line2'),'tg',nSize,50,87.8,tc,{x:134.7+dx}));
     ops.push({op:'line',x1:136.2+dx,y1:102.35,x2:391.0+dx,y2:102.35,color:tc,lw:1});
     const lx=135.33+dx, gap=8;
-    const vx=lbl=>lx+m(lbl,'bd2',15,40)+gap;
+    const valX=lx+Math.max(...['FLAVOR','BODY','FINISH','PROCESS'].map(l=>m(l,'bold',15,40)))+gap;
+    const vx=()=>valX;
     ops.push(T('FLAVOR','bold',15,40,140.8,tc,{x:lx}));
     const fx=vx('FLAVOR');
     const lines=wrapText(m, v('desc'),'tg',15,0,389.7+dx-fx);
@@ -848,7 +849,8 @@ function buildSOERetail(colors){
     ops.push(T(v('line2'),'tg',nSize,0,92.2,tc,{x:108.3+dx}));
     ops.push({op:'line',x1:110.2+dx,y1:106.65,x2:364.8+dx,y2:106.65,color:tc,lw:1});
     const lx=109.34+dx, gap=8;
-    const vx=lbl=>lx+m(lbl,'bd2',14,0)+gap;
+    const valX=lx+Math.max(...['FLAVOR','BODY','FINISH','PROCESS'].map(l=>m(l,'bold',14,0)))+gap;
+    const vx=()=>valX;
     ops.push(T('FLAVOR','bold',14,0,145.4,tc,{x:lx}));
     const fx=vx('FLAVOR');
     const lines=wrapText(m, v('desc'),'tg',15,0,364.8+dx-fx);
