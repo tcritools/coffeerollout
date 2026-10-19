@@ -1003,7 +1003,9 @@ async function renderPDF(docs){ // docs: array of layout docs -> one PDFDocument
   for(const k of need){
     const bytes=FONT_SLOTS[k].bytes.slice(0);
     let psName=null; try{ psName=fontkit.create(new Uint8Array(bytes.slice(0))).postscriptName; }catch(e){}
-    emb[k]=await pdf.embedFont(bytes, psName? {customName:psName} : {}); // full embed, original PostScript names
+    const opts={ features:{ liga:false, clig:false, dlig:false } }; // no auto ligatures (fl/fi glyphs space wrong in PDF)
+    if(psName) opts.customName=psName;
+    emb[k]=await pdf.embedFont(bytes, opts);
   }
   const C = c => cmyk(c.cmyk[0]/100, c.cmyk[1]/100, c.cmyk[2]/100, c.cmyk[3]/100);
   const pdfW=(f,t,s)=>emb[f].widthOfTextAtSize(t,s);
