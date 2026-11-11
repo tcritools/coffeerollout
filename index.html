@@ -631,9 +631,14 @@ function applyInfosheet(rows){
   if(soeLike) setRelease('soe');
 
   set('line1', country.toUpperCase());
-  // line2: coffee name minus country / process / SOE / year tokens
-  const drop = new Set([...country.toLowerCase().split(/\s+/), ...process.toLowerCase().split(/\s+/), 'soe','single','origin','espresso','anaerobic','washed','natural','honey']);
-  const l2 = name.split(/\s+/).filter(t=>{ const c=t.toLowerCase().replace(/[^a-z0-9.'-]/g,'');
+  // line2: coffee name minus country / process (each removed once, as a whole phrase,
+  // so "El Salvador El Caracol" keeps the farm's "El") / SOE / year tokens
+  const phrase = s => new RegExp('(^|\\s)'+s.trim().replace(/[.*+?^${}()|[\]\\]/g,'\\$&').replace(/\s+/g,'\\s+')+'(?=\\s|$)','i');
+  let rest = name;
+  if(country.trim()) rest = rest.replace(phrase(country),' ');
+  if(process.trim()) rest = rest.replace(phrase(process),' ');
+  const drop = new Set(['soe','single','origin','espresso','anaerobic','washed','natural','honey']);
+  const l2 = rest.split(/\s+/).filter(t=>{ const c=t.toLowerCase().replace(/[^a-z0-9.'-]/g,'');
       return c && !drop.has(c) && !/^(19|20)\d\d$/.test(c) && !/^rc$/.test(c) && !(/roaster/.test(c)); }).join(' ');
   set('line2', l2.toUpperCase());
   set('line3', state.release==='soe' ? 'SINGLE ORIGIN ESPRESSO' : region.replace(/\s+district$/i,'').toUpperCase());
